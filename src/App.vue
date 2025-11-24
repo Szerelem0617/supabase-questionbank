@@ -43,42 +43,47 @@ async function getImages() {
   findingSimilar.value = false
 
   try {
-    const { data: fileList, error: listError } = await supabase.storage
-      .from('bucket')
-      .list('', {
-        limit: 100,
-        offset: 0,
-        sortBy: { column: 'name', order: 'asc' },
-      })
-    if (listError) throw listError;
-    if (!fileList || fileList.length === 0) {
-      loadingText.value = '存储桶中没有文件。 (请确认 Supabase RLS 策略已设为公开)'
-      return
-    }
-    const filteredList = fileList.filter(file => file.name.includes('ms') && file.name !== '.emptyFolderPlaceholder')
-    if (filteredList.length === 0) {
-      loadingText.value = '没有找到符合条件的图片（包含 "ms"）。'
-      return
-    }
-    const randomIndex = Math.floor(Math.random() * filteredList.length)
-    const randomFile = filteredList[randomIndex]
-    currentFilename.value = randomFile.name
+    // 1. Fetch all IDs from the specific paper '9618_s22_11'.
+    const paperToDisplay = '9618_s22_qp_11.pdf';
+    const { data: allIds, error: idError } = await supabase
+      .from('questions_data')
+      .select('id')
+      .eq('paper_filename', paperToDisplay); // Filter by the specific paper
 
-    const fileId = currentFilename.value.substring(0, currentFilename.value.lastIndexOf('.')).replace('_ms_', '_qp_')
-    
+    if (idError) throw idError;
+    if (!allIds || allIds.length === 0) {
+      throw new Error(`数据库中没有找到任何关于 '${paperToDisplay}' 的题目。`);
+    }
+
+    // 2. Pick a random ID from the filtered list
+    const randomIndex = Math.floor(Math.random() * allIds.length);
+    const randomId = allIds[randomIndex].id;
+
+    // 3. Fetch the full data for that single random ID.
     const { data: questionData, error: dbError } = await supabase
       .from('questions_data')
       .select('id, paper_filename, ms_vector')
-      .eq('id', fileId)
-      .single()
-    if (dbError) throw dbError
-    currentQuestionData.value = questionData
+      .eq('id', randomId)
+      .single(); 
+    
+    if (dbError) throw dbError;
 
-    const { data: publicUrlData } = supabase.storage.from('bucket').getPublicUrl(currentFilename.value)
-    images.value = [publicUrlData.publicUrl]
+    // 4. Construct the image filename from the guaranteed valid database ID.
+    const msFilename = questionData.id.replace('_qp_', '_ms_') + '.png';
+
+    // 5. Get the public URL for that image.
+    const { data: publicUrlData } = supabase.storage
+      .from('bucket')
+      .getPublicUrl(msFilename);
+    
+    // 6. Update the application state.
+    currentQuestionData.value = questionData;
+    currentFilename.value = msFilename;
+    images.value = [publicUrlData.publicUrl];
+
   } catch (error) {
     console.error('Error in getImages:', error)
-    loadingText.value = '获取图片时发生意外错误。'
+    loadingText.value = `获取图片时发生错误: ${error.message}`
   }
 }
 
