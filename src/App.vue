@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { supabase } from './supabase'
+import { store } from './store'
 import Auth from './components/Auth.vue'
 import Avatar from './components/Avatar.vue'
 
@@ -9,7 +10,6 @@ const showLoginPage = ref(false)
 
 // --- Auth ---
 const session = ref(null)
-const loading = ref(false)
 
 function goToLogin() {
   showLoginPage.value = true
@@ -18,6 +18,7 @@ function goToLogin() {
 async function signOut() {
   await supabase.auth.signOut()
   session.value = null
+  store.profile = null // Clear profile on sign out
 }
 
 // --- Gallery ---
@@ -144,20 +145,18 @@ async function findSimilarImage() {
 }
 
 onMounted(() => {
-  // --- Auth Listener ---
-  supabase.auth.onAuthStateChange((_, _session) => {
+  // Handles all auth events
+  supabase.auth.onAuthStateChange((event, _session) => {
     session.value = _session
+    // On initial load with a session, or after a user signs in
+    if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+      store.fetchProfile();
+      showLoginPage.value = false;
+    }
   })
   
-  // --- Load Gallery ---
+  // Load public gallery for everyone
   getImages()
-})
-
-// Hide login page when session is detected
-watch(session, (newSession) => {
-  if (newSession) {
-    showLoginPage.value = false;
-  }
 })
 
 </script>
