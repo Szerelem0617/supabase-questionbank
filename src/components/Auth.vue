@@ -41,6 +41,25 @@ const handleRegister = async () => {
     loading.value = false
   }
 }
+
+const signInWithOAuth = async (provider) => {
+  try {
+    loading.value = true
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: provider,
+      options: {
+        redirectTo: window.location.origin, // Redirects back to the current application URL
+      },
+    })
+    if (error) throw error
+  } catch (error) {
+    if (error instanceof Error) {
+      alert(error.message)
+    }
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <template>
@@ -63,6 +82,17 @@ const handleRegister = async () => {
         <button @click="handleRegister" class="button" :disabled="loading">
           {{ loading ? 'Loading' : 'Register' }}
         </button>
+      </div>
+      <div class="oauth-buttons">
+        <button @click="signInWithOAuth('google')" class="button oauth-google" :disabled="loading">
+          Sign in with Google
+        </button>
+        <button @click="signInWithOAuth('github')" class="button oauth-github" :disabled="loading">
+          Sign in with GitHub
+        </button>
+      </div>
+      <div class="back-link">
+        <button @click="$emit('back')" class="button-link">Back to Gallery</button>
       </div>
     </div>
   </div>
@@ -114,5 +144,34 @@ const handleRegister = async () => {
 }
 .button:disabled {
   background-color: #999;
+}
+.oauth-buttons {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.oauth-google {
+  background-color: #db4437; /* Google red */
+}
+.oauth-google:hover {
+  background-color: #c23321;
+}
+.oauth-github {
+  background-color: #333; /* GitHub dark gray */
+}
+.oauth-github:hover {
+  background-color: #000;
+}
+.back-link {
+  margin-top: 1.5rem;
+}
+.button-link {
+  background: none;
+  border: none;
+  color: #3e635f;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.9rem;
 }
 </style>
