@@ -54,7 +54,8 @@ async function fetchMessages() {
         user_id,
         profiles (
           display_name,
-          avatar_url
+          avatar_url,
+          website
         )
       `)
       .order('created_at', { ascending: false })
@@ -145,7 +146,8 @@ onMounted(() => {
             id, created_at, message, user_id,
             profiles (
               display_name,
-              avatar_url
+              avatar_url,
+              website
             )
           `)
           .eq('id', payload.new.id)
@@ -214,7 +216,10 @@ onUnmounted(() => {
             alt="avatar" 
             class="author-avatar"
           />
-          <span class="author-name">{{ getAuthorDisplayName(msg) }}</span>
+          <a v-if="msg.profiles?.website" :href="msg.profiles.website" target="_blank" rel="noopener noreferrer" class="author-name-link">
+            <span class="author-name">{{ getAuthorDisplayName(msg) }}</span>
+          </a>
+          <span v-else class="author-name">{{ getAuthorDisplayName(msg) }}</span>
         </div>
         <p class="message-content">{{ msg.message }}</p>
         <span class="message-time">{{ new Date(msg.created_at).toLocaleString() }}</span>
@@ -311,6 +316,13 @@ h2 {
 .author-name {
   font-weight: bold;
   font-size: 1.1em;
+}
+.author-name-link {
+  color: #007bff; /* Standard blue link color */
+  text-decoration: underline; /* Always underlined */
+}
+.author-name-link:hover {
+  color: #0056b3; /* Darker blue on hover */
 }
 .message-content {
   margin: 0 0 12px 0;
