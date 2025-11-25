@@ -21,7 +21,7 @@ export const store = reactive({
       const { user } = sessionData.session
       const { data, error, status } = await supabase
         .from('profiles')
-        .select(`username, website, avatar_url`)
+        .select(`username, website, avatar_url, display_name`)
         .eq('id', user.id)
         .single()
 
@@ -32,8 +32,43 @@ export const store = reactive({
           username: data.username,
           website: data.website,
           avatar_url: data.avatar_url,
+          display_name: data.display_name,
+          email: user.email,
         }
       }
+    } catch (error) {
+      alert(error.message)
+    } finally {
+      this.loading = false
+    }
+  },
+
+  /**
+   * Updates the current user's profile.
+   * @param {object} profileData The profile data to update { displayName, website }.
+   */
+  async updateProfile(profileData) {
+    try {
+      this.loading = true
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("User not found.")
+
+      const updates = {
+        id: user.id,
+        display_name: profileData.displayName,
+        website: profileData.website,
+        updated_at: new Date(),
+      }
+
+      const { error } = await supabase.from('profiles').upsert(updates)
+      if (error) throw error
+
+      // Update local store
+      if (this.profile) {
+        this.profile.display_name = profileData.displayName
+        this.profile.website = profileData.website
+      }
+      alert('Profile updated successfully!')
     } catch (error) {
       alert(error.message)
     } finally {
@@ -79,15 +114,6 @@ export const store = reactive({
         updated_at: new Date(),
       }
 
-      // Ensure username is present for the upsert, especially for new profiles
-      if (this.profile && this.profile.username) {
-          profileUpdates.username = this.profile.username;
-      } else {
-          // This fallback should ideally be handled by the trigger, but as a safeguard
-          // Ensure it matches the format of the trigger-generated username if possible
-          profileUpdates.username = 'user_' + user.id.substring(0, 8);
-      }
-
       let { error: updateError } = await supabase.from('profiles').upsert(profileUpdates)
       if (updateError) {
         throw updateError
@@ -98,7 +124,7 @@ export const store = reactive({
         this.profile.avatar_url = urlData.publicUrl
       } else {
         // If profile was just created, update the local store too
-        this.profile = { ...profileUpdates, avatar_url: urlData.publicUrl };
+        this.profile = { ...this.profile, ...profileUpdates };
       }
       alert('Avatar updated successfully!')
 
