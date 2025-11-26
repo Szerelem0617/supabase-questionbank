@@ -27,13 +27,14 @@ async function signOut() {
 const images = ref([])
 const loadingText = ref('正在加载图片...')
 const currentQuestionData = ref(null)
-const currentFilename = ref('')
+const currentFilename = ref('') // Now tracks the currently displayed filename (QP or MS)
 const msDetails = ref('')
 const showDetails = ref(false)
 const detailsLoading = ref(false)
 const similarityScore = ref(null)
 const findingSimilar = ref(false)
 const benchmarkData = ref(null) // { legacy: { time, payload }, edge: { time, payload } }
+const isShowingAnswer = ref(false) // Default to showing Question
 
 async function getImages() {
   images.value = []
@@ -45,6 +46,7 @@ async function getImages() {
   loadingText.value = '正在加载图片...'
   findingSimilar.value = false
   benchmarkData.value = null
+  isShowingAnswer.value = false // Reset to Question mode on new load
 
   try {
     // 1. Fetch all IDs from the specific paper '9618_s22_11'.
@@ -72,23 +74,73 @@ async function getImages() {
     
     if (dbError) throw dbError;
 
-    // 4. Construct the image filename from the guaranteed valid database ID.
-    const msFilename = questionData.id.replace('_qp_', '_ms_') + '.png';
+    // 4. Construct the image filenames.
+    // Default QP filename logic: 
+    // ID format: 9618_s22_qp_11_1_a  -> Target: 9618_s22_11_q1_1.png
+    
+    let qpFilename = '';
+    try {
+        const parts = questionData.id.split('_');
+        // parts: ['9618', 's22', 'qp', '11', '1', 'a']
+        if (parts.length >= 5) {
+            const code = parts[0];
+            const seasonYear = parts[1];
+            const paper = parts[3]; // Skip 'qp' at index 2
+            const qNum = parts[4];
+            
+            qpFilename = `${code}_${seasonYear}_${paper}_q${qNum}_1.png`;
+        } else {
+            // Fallback if ID format is unexpected
+             qpFilename = questionData.id + '.png';
+        }
+    } catch (e) {
+        console.error("Error parsing ID for filename:", e);
+        qpFilename = questionData.id + '.png';
+    }
 
-    // 5. Get the public URL for that image.
+    // MS filename logic (assuming it matches ID structure with _ms_ replacement)
+    const msFilename = questionData.id.replace('_qp_', '_ms_') + '.png';
+    
+    // Store these for toggling
+    questionData.qpFilename = qpFilename;
+    questionData.msFilename = msFilename;
+
+    // 5. Update the application state to show QP by default.
+    currentQuestionData.value = questionData;
+    currentFilename.value = qpFilename;
+    
+    // Get public URL for the QP image
     const { data: publicUrlData } = supabase.storage
       .from('bucket')
-      .getPublicUrl(msFilename);
-    
-    // 6. Update the application state.
-    currentQuestionData.value = questionData;
-    currentFilename.value = msFilename;
+      .getPublicUrl(qpFilename);
+      
     images.value = [publicUrlData.publicUrl];
 
   } catch (error) {
     console.error('Error in getImages:', error)
     loadingText.value = `获取图片时发生错误: ${error.message}`
   }
+}
+
+function toggleMode() {
+  if (!currentQuestionData.value) return;
+  
+  isShowingAnswer.value = !isShowingAnswer.value;
+  
+  let newFilename = '';
+  if (isShowingAnswer.value) {
+    // Switch to MS
+    newFilename = currentQuestionData.value.msFilename;
+  } else {
+    // Switch to QP
+    newFilename = currentQuestionData.value.qpFilename;
+  }
+  
+  currentFilename.value = newFilename;
+  const { data: publicUrlData } = supabase.storage
+      .from('bucket')
+      .getPublicUrl(newFilename);
+  images.value = [publicUrlData.publicUrl];
 }
 
 async function fetchDetails() {
@@ -200,15 +252,35 @@ async function findSimilarImage() {
     // Note: If Edge Function doesn't return vector, Legacy track will fail next time unless we fetch it.
     // But for this 'One-Click' demo, it's fine.
     
+    // Construct filenames for the NEW question
+    let nextQpFilename = '';
+    try {
+        const parts = nextQuestion.id.split('_');
+        if (parts.length >= 5) {
+            nextQpFilename = `${parts[0]}_${parts[1]}_${parts[3]}_q${parts[4]}_1.png`;
+        } else {
+            nextQpFilename = nextQuestion.id + '.png';
+        }
+    } catch (e) {
+        nextQpFilename = nextQuestion.id + '.png';
+    }
+    const nextMsFilename = nextQuestion.id.replace('_qp_', '_ms_') + '.png';
+
     currentQuestionData.value = {
       id: nextQuestion.id,
       paper_filename: nextQuestion.paper_filename,
-      ms_vector: nextQuestion.ms_vector // Might be undefined from Edge Function
+      ms_vector: nextQuestion.ms_vector, // Might be undefined from Edge Function
+      qpFilename: nextQpFilename,
+      msFilename: nextMsFilename
     }
     similarityScore.value = nextQuestion.similarity
-    const newMsFilename = nextQuestion.id.replace('_qp_', '_ms_') + '.png'
-    currentFilename.value = newMsFilename
-    const { data: publicUrlData } = supabase.storage.from('bucket').getPublicUrl(newMsFilename)
+    
+    // Respect current mode: if user was viewing Answer, show Answer for new image too?
+    // Usually better to reset to Question for a new search.
+    isShowingAnswer.value = false; 
+    
+    currentFilename.value = nextQpFilename
+    const { data: publicUrlData } = supabase.storage.from('bucket').getPublicUrl(nextQpFilename)
     images.value = [publicUrlData.publicUrl]
 
   } catch (error) {
@@ -268,6 +340,9 @@ onMounted(() => {
           相似度: {{ (similarityScore * 100).toFixed(2) }}%
         </div>
         <div class="button-group">
+          <button @click="toggleMode" class="details-button" style="background-color: #e67e22;">
+            {{ isShowingAnswer ? '🔙 显示题目' : '👀 显示答案' }}
+          </button>
           <button @click="findSimilarImage" :disabled="findingSimilar" class="details-button">
             {{ findingSimilar ? '查找中 (Running Benchmark)...' : '换一张 (最相似)' }}
           </button>

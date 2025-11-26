@@ -1,0 +1,4 @@
+schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
+public,profiles,Anyone can view profiles,PERMISSIVE,{public},SELECT,true,null
+public,profiles,Users can insert own profile,PERMISSIVE,{public},INSERT,null,(auth.uid() = id)
+public,profiles,Users can update own profile,PERMISSIVE,{public},UPDATE,(auth.uid() = id),(auth.uid() = id)
