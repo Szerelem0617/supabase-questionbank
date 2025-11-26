@@ -47,7 +47,7 @@ async function fetchSiblings(code, seasonYear, paper, qNum) {
     
     const { data, error } = await supabase
         .from('questions_data')
-        .select('id, question_raw_number, start_y, end_y, start_page')
+        .select('id, question_raw_number, start_y, end_y, start_page, details') // Added details
         .filter('id', 'like', `${idPrefix}%`) // Search broadly: _1, _10, _1_a
         .order('start_page', { ascending: true }) // ORDER BY PAGE FIRST!
         .order('start_y', { ascending: true });   // THEN BY Y
@@ -84,8 +84,43 @@ async function fetchSiblings(code, seasonYear, paper, qNum) {
     return filtered;
 }
 
-function handleSubQClick(sibling) {
-    alert(`Current sub-question: ${sibling.question_raw_number}`);
+async function handleSubQClick(sibling) {
+    // alert(`Current sub-question: ${sibling.question_raw_number}`);
+    
+    const qNum = sibling.question_raw_number;
+    const qText = sibling.details || "No text details available for this question.";
+    
+    // Simple UI feedback (in a real app, use a modal or toast)
+    const userConfirmed = confirm(`Ask AI to explain Question ${qNum}?\n\nPreview: ${qText.substring(0, 50)}...`);
+    
+    if (!userConfirmed) return;
+    
+    // Show loading state (using alert is blocking, better to use a reactive variable, 
+    // but for this demo we'll just rely on the console or a quick 'Thinking...' alert that user closes)
+    // A better way: set a global 'aiThinking' state and show a spinner overlay.
+    // Let's use a simple prompt for now or just fire it.
+    
+    console.log("Asking AI...");
+    // To prevent blocking UI, we won't alert "Loading", but we can change the button cursor or something.
+    // Let's just fire and alert result.
+    
+    try {
+        const { data, error } = await supabase.functions.invoke('ask-ai', {
+            body: { questionText: qText }
+        });
+
+        if (error) throw error;
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        alert(`🤖 AI Analysis for ${qNum}:\n\n${data.answer}`);
+        
+    } catch (e) {
+        console.error("AI Error:", e);
+        alert(`Failed to ask AI: ${e.message}`);
+    }
 }
 
 // Calculate relative positions for buttons, grouped by page index (0, 1, 2...)
