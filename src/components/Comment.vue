@@ -12,28 +12,14 @@ let subscription = null
 
 /**
  * Helper function to determine the display name for an author.
- * Prioritizes profiles.username, then the email local part for the current user,
- * otherwise defaults to 'Anonymous'.
+ * Prioritizes profiles.display_name, otherwise defaults to 'Unnamed'.
  */
 function getAuthorDisplayName(msg) {
-  // Add debug information
-  console.log('GetAuthorDisplayName Debug:', {
-    userId: msg.user_id,
-    profile: msg.profiles,
-    email: msg.email // email is now attached directly to the message object
-  });
-
-  // Use the display_name from the profiles table if it exists and is not empty
+  // Use the display_name from the profiles table if it exists and is not an empty string
   if (msg.profiles?.display_name) {
     return msg.profiles.display_name;
   }
-
-  // Fallback to the user's email local part
-  if (msg.email) {
-    return msg.email.split('@')[0];
-  }
-
-  return 'Anonymous';
+  return 'Unnamed';
 }
 
 
@@ -62,35 +48,8 @@ async function fetchMessages() {
       .limit(100)
 
     if (messagesError) throw messagesError
-
-    // 2. Identify users who need an email fallback
-    const userIdsToFetch = messagesData
-      .filter(msg => !msg.profiles?.display_name)
-      .map(msg => msg.user_id)
     
-    const uniqueUserIds = [...new Set(userIdsToFetch)]
-
-    let emailMap = {};
-    if (uniqueUserIds.length > 0) {
-      // 3. Call the RPC function to get emails for those users
-      const { data: emailData, error: rpcError } = await supabase.rpc('get_user_emails', {
-        user_ids: uniqueUserIds
-      })
-      if (rpcError) throw rpcError
-      
-      // Create a map of user_id -> email
-      for (const user of emailData) {
-        emailMap[user.id] = user.email;
-      }
-    }
-
-    // 4. Merge the email data back into the messages
-    const finalMessages = messagesData.map(msg => ({
-      ...msg,
-      email: emailMap[msg.user_id] || null
-    }))
-    
-    messages.value = finalMessages
+    messages.value = messagesData
 
   } catch (error) {
     console.error('Error fetching messages:', error.message)
@@ -159,18 +118,6 @@ onMounted(() => {
         }
 
         if (newMessage) {
-            // If the new message doesn't have a display name, fetch email as a fallback
-            if (!newMessage.profiles?.display_name) {
-                const { data: emailData, error: rpcError } = await supabase.rpc('get_user_emails', {
-                    user_ids: [newMessage.user_id]
-                })
-
-                if (rpcError) {
-                    console.error('Error fetching email for new message:', rpcError)
-                } else if (emailData && emailData.length > 0) {
-                    newMessage.email = emailData[0].email
-                }
-            }
             messages.value.unshift(newMessage) // Add new message to the top of the list
         }
       }
