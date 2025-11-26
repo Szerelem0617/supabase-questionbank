@@ -36,6 +36,59 @@ const findingSimilar = ref(false)
 const benchmarkData = ref(null) // { legacy: { time, payload }, edge: { time, payload } }
 const isShowingAnswer = ref(false) // Default to showing Question
 
+// Helper to recursively load multi-page images
+async function loadAllPages(firstPageFilename, isMs = false) {
+  // 1. Get URL for the first page
+  const { data: firstUrlData } = supabase.storage
+    .from('bucket')
+    .getPublicUrl(firstPageFilename);
+  
+  // Reset images array with just the first page initially
+  images.value = [firstUrlData.publicUrl];
+
+  // If it's MS (Answer), we assume it's single page, so stop here.
+  if (isMs) return;
+
+  // If it's QP, we check for _2, _3, etc.
+  // Pattern check: does it end in _1.png?
+  if (!firstPageFilename.endsWith('_1.png')) return;
+
+  const baseName = firstPageFilename.slice(0, -6); // remove '_1.png'
+  let pageNum = 2;
+  let keepChecking = true;
+
+  while (keepChecking) {
+    const nextFilename = `${baseName}_${pageNum}.png`;
+    const { data: nextUrlData } = supabase.storage
+      .from('bucket')
+      .getPublicUrl(nextFilename);
+    
+    const url = nextUrlData.publicUrl;
+
+    // Verify existence using a lightweight image load
+    try {
+      await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          images.value.push(url); // Add to display list
+          resolve();
+        };
+        img.onerror = () => {
+          // Error means page doesn't exist
+          reject();
+        };
+        img.src = url;
+      });
+      pageNum++;
+      // Safety break to prevent infinite loops if something goes wrong
+      if (pageNum > 10) keepChecking = false; 
+    } catch (e) {
+      // Stop checking on error (404)
+      keepChecking = false;
+    }
+  }
+}
+
 async function getImages() {
   images.value = []
   currentQuestionData.value = null
@@ -109,12 +162,8 @@ async function getImages() {
     currentQuestionData.value = questionData;
     currentFilename.value = qpFilename;
     
-    // Get public URL for the QP image
-    const { data: publicUrlData } = supabase.storage
-      .from('bucket')
-      .getPublicUrl(qpFilename);
-      
-    images.value = [publicUrlData.publicUrl];
+    // Load pages (recursive check for QP)
+    await loadAllPages(qpFilename, false);
 
   } catch (error) {
     console.error('Error in getImages:', error)
@@ -131,16 +180,16 @@ function toggleMode() {
   if (isShowingAnswer.value) {
     // Switch to MS
     newFilename = currentQuestionData.value.msFilename;
+    // Load MS (single page)
+    loadAllPages(newFilename, true);
   } else {
     // Switch to QP
     newFilename = currentQuestionData.value.qpFilename;
+    // Load QP (multi page check)
+    loadAllPages(newFilename, false);
   }
   
   currentFilename.value = newFilename;
-  const { data: publicUrlData } = supabase.storage
-      .from('bucket')
-      .getPublicUrl(newFilename);
-  images.value = [publicUrlData.publicUrl];
 }
 
 async function fetchDetails() {
@@ -280,8 +329,8 @@ async function findSimilarImage() {
     isShowingAnswer.value = false; 
     
     currentFilename.value = nextQpFilename
-    const { data: publicUrlData } = supabase.storage.from('bucket').getPublicUrl(nextQpFilename)
-    images.value = [publicUrlData.publicUrl]
+    // Load Pages
+    await loadAllPages(nextQpFilename, false);
 
   } catch (error) {
     console.error('Error finding similar image:', error)
@@ -333,8 +382,10 @@ onMounted(() => {
       </div>
 
       <div v-if="images.length > 0" class="image-wrapper">
-        <div class="image-item-single">
-          <img :src="images[0]" :key="images[0]" alt="Supabase Image" />
+        <div class="image-list">
+          <div v-for="(imgUrl, index) in images" :key="index" class="image-item">
+             <img :src="imgUrl" alt="Supabase Image" />
+          </div>
         </div>
         <div v-if="similarityScore !== null" class="similarity-display">
           相似度: {{ (similarityScore * 100).toFixed(2) }}%
@@ -441,19 +492,25 @@ body {
 .image-wrapper {
   margin-top: 20px;
 }
-.image-item-single {
-  margin: 0 auto;
+.image-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* Space between pages */
+  align-items: center;
+}
+.image-item {
   width: 90%;
   max-width: 1200px;
-  height: 50vh;
+  /* Remove fixed height to allow natural image height */
   display: flex;
   justify-content: center;
   align-items: center;
 }
-.image-item-single img {
+.image-item img {
   width: 100%;
-  height: 100%;
+  height: auto; /* Maintain aspect ratio */
   object-fit: contain;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* Optional: shadow for better visibility */
 }
 .similarity-display {
   margin-top: 15px;
