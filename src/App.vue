@@ -36,6 +36,75 @@ const findingSimilar = ref(false)
 const benchmarkData = ref(null) // { legacy: { time, payload }, edge: { time, payload } }
 const isShowingAnswer = ref(false) // Default to showing Question
 
+// Helper to fetch sibling sub-questions for coordinate calculation
+async function fetchSiblings(code, seasonYear, paper, qNum) {
+    console.log(`fetchSiblings called for: code=${code}, sy=${seasonYear}, paper=${paper}, q=${qNum}`);
+    
+    const idPrefix = `${code}_${seasonYear}_qp_${paper}_${qNum}_`;
+    console.log(`Searching for ID prefix: ${idPrefix}`);
+    
+    const { data, error } = await supabase
+        .from('questions_data')
+        .select('id, question_raw_number, start_y, end_y, start_page')
+        .filter('id', 'like', `${idPrefix}%`)
+        .order('start_y', { ascending: true });
+        
+    if (error) {
+        console.error("Error fetching siblings:", error);
+        return [];
+    }
+    
+    console.log("Raw siblings data:", data);
+    
+    // Filter to ensure strict match on qNum
+    const filtered = data.filter(item => {
+        const parts = item.id.split('_');
+        // Check if 5th element (index 4) is exactly qNum
+        const isMatch = parts.length >= 5 && parts[4] === qNum;
+        return isMatch;
+    });
+    
+    console.log("Filtered siblings:", filtered);
+    return filtered;
+}
+
+// Calculate relative positions for buttons
+function calculateOverlayPositions(siblings) {
+    console.log("calculateOverlayPositions called with:", siblings);
+    
+    if (!siblings || siblings.length === 0) return [];
+    
+    const startPage = siblings[0].start_page;
+    const samePageSiblings = siblings.filter(s => s.start_page === startPage);
+    
+    console.log("Same page siblings:", samePageSiblings);
+    
+    if (samePageSiblings.length === 0) return [];
+
+    const minY = Math.min(...samePageSiblings.map(s => s.start_y));
+    const maxY = Math.max(...samePageSiblings.map(s => s.end_y));
+    const totalHeight = maxY - minY;
+    
+    console.log(`Crop bounds: minY=${minY}, maxY=${maxY}, height=${totalHeight}`);
+    
+    return samePageSiblings.map(s => {
+        // Calculate position relative to the TOP of the crop (minY)
+        const subQMidY = (s.start_y + s.end_y) / 2;
+        const relativeTop = subQMidY - minY;
+        let percent = (relativeTop / totalHeight) * 100;
+        
+        // Clamp percentage to be safe
+        percent = Math.max(0, Math.min(100, percent));
+        
+        console.log(`SubQ ${s.id}: midY=${subQMidY}, relative=${relativeTop}, percent=${percent}%`);
+        
+        return {
+            ...s,
+            topPercent: percent
+        };
+    });
+}
+
 // Helper to recursively load multi-page images
 async function loadAllPages(firstPageFilename, isMs = false) {
   // 1. Get URL for the first page
@@ -90,6 +159,7 @@ async function loadAllPages(firstPageFilename, isMs = false) {
 }
 
 async function getImages() {
+  console.log(">>> getImages STARTED <<<"); // CONFIRM EXECUTION
   images.value = []
   currentQuestionData.value = null
   currentFilename.value = ''
@@ -104,6 +174,8 @@ async function getImages() {
   try {
     // 1. Fetch all IDs from the specific paper '9618_s22_11'.
     const paperToDisplay = '9618_s22_qp_11.pdf';
+    console.log(`Fetching IDs for paper: ${paperToDisplay}`);
+    
     const { data: allIds, error: idError } = await supabase
       .from('questions_data')
       .select('id')
@@ -113,60 +185,73 @@ async function getImages() {
     if (!allIds || allIds.length === 0) {
       throw new Error(`数据库中没有找到任何关于 '${paperToDisplay}' 的题目。`);
     }
+    console.log(`Found ${allIds.length} IDs.`);
 
     // 2. Pick a random ID from the filtered list
     const randomIndex = Math.floor(Math.random() * allIds.length);
     const randomId = allIds[randomIndex].id;
+    console.log(`Selected Random ID: ${randomId}`);
 
     // 3. Fetch the full data for that single random ID.
     const { data: questionData, error: dbError } = await supabase
       .from('questions_data')
-      .select('id, paper_filename, ms_vector')
+      .select('id, paper_filename, ms_vector, question_raw_number')
       .eq('id', randomId)
       .single(); 
     
     if (dbError) throw dbError;
+    console.log("Fetched Question Data:", questionData);
 
     // 4. Construct the image filenames.
-    // Default QP filename logic: 
-    // ID format: 9618_s22_qp_11_1_a  -> Target: 9618_s22_11_q1_1.png
-    
     let qpFilename = '';
+    let siblingsData = [];
+    
     try {
         const parts = questionData.id.split('_');
-        // parts: ['9618', 's22', 'qp', '11', '1', 'a']
+        // Expecting: 9618_s22_qp_11_1_a (6 parts) or similar
+        console.log("ID Parts:", parts);
+        
         if (parts.length >= 5) {
             const code = parts[0];
             const seasonYear = parts[1];
-            const paper = parts[3]; // Skip 'qp' at index 2
+            const paper = parts[3];
             const qNum = parts[4];
             
             qpFilename = `${code}_${seasonYear}_${paper}_q${qNum}_1.png`;
+            console.log(`Constructed QP Filename: ${qpFilename}`);
+            
+            // Fetch siblings for overlay
+            console.log("Calling fetchSiblings...");
+            const siblings = await fetchSiblings(code, seasonYear, paper, qNum);
+            console.log("Siblings returned:", siblings);
+            
+            siblingsData = calculateOverlayPositions(siblings);
+            console.log("Calculated Positions:", siblingsData);
+            
         } else {
-            // Fallback if ID format is unexpected
+             console.warn("ID format too short, using fallback.");
              qpFilename = questionData.id + '.png';
         }
     } catch (e) {
-        console.error("Error parsing ID for filename:", e);
+        console.error("Error parsing ID or fetching siblings:", e);
         qpFilename = questionData.id + '.png';
     }
 
-    // MS filename logic (assuming it matches ID structure with _ms_ replacement)
     const msFilename = questionData.id.replace('_qp_', '_ms_') + '.png';
     
-    // Store these for toggling
     questionData.qpFilename = qpFilename;
     questionData.msFilename = msFilename;
+    questionData.siblings = siblingsData; // Store overlay data
 
-    // 5. Update the application state to show QP by default.
+    // 5. Update state
     currentQuestionData.value = questionData;
     currentFilename.value = qpFilename;
     
-    // Load pages (recursive check for QP)
     await loadAllPages(qpFilename, false);
+    console.log(">>> getImages FINISHED <<<");
 
   } catch (error) {
-    console.error('Error in getImages:', error)
+    console.error('CRITICAL ERROR in getImages:', error)
     loadingText.value = `获取图片时发生错误: ${error.message}`
   }
 }
@@ -383,8 +468,22 @@ onMounted(() => {
 
       <div v-if="images.length > 0" class="image-wrapper">
         <div class="image-list">
-          <div v-for="(imgUrl, index) in images" :key="index" class="image-item">
+          <div v-for="(imgUrl, index) in images" :key="index" class="image-item" style="position: relative;">
              <img :src="imgUrl" alt="Supabase Image" />
+             
+             <!-- Sub-question Overlay Buttons (Only show on QP mode and on the first page for now) -->
+             <div v-if="!isShowingAnswer && index === 0 && currentQuestionData && currentQuestionData.siblings" class="overlay-container">
+                <button 
+                    v-for="sibling in currentQuestionData.siblings" 
+                    :key="sibling.id"
+                    class="subq-btn"
+                    :style="{ top: sibling.topPercent + '%' }"
+                    @click="alert(`Current sub-question: ${sibling.question_raw_number}`)"
+                    :title="sibling.question_raw_number"
+                >
+                    {{ sibling.question_raw_number.split('(').pop().replace(')', '') }}
+                </button>
+             </div>
           </div>
         </div>
         <div v-if="similarityScore !== null" class="similarity-display">
@@ -512,6 +611,39 @@ body {
   object-fit: contain;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* Optional: shadow for better visibility */
 }
+
+/* Sub-question Overlay Buttons */
+.overlay-container {
+    position: absolute;
+    top: 0;
+    right: 0; /* Align to right edge of the container */
+    height: 100%;
+    width: 50px; /* Width for the button area */
+}
+.subq-btn {
+    position: absolute;
+    right: -50px; /* Push outside the image */
+    transform: translateY(-50%); /* Center vertically on the coordinate */
+    background-color: #3e635f;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, background-color 0.2s;
+    z-index: 10;
+}
+.subq-btn:hover {
+    transform: translateY(-50%) scale(1.1);
+    background-color: #2c4643;
+}
+
 .similarity-display {
   margin-top: 15px;
   font-size: 1.2em;
