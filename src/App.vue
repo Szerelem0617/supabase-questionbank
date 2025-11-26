@@ -40,31 +40,47 @@ const isShowingAnswer = ref(false) // Default to showing Question
 async function fetchSiblings(code, seasonYear, paper, qNum) {
     console.log(`fetchSiblings called for: code=${code}, sy=${seasonYear}, paper=${paper}, q=${qNum}`);
     
-    const idPrefix = `${code}_${seasonYear}_qp_${paper}_${qNum}_`;
-    console.log(`Searching for ID prefix: ${idPrefix}`);
+    // Improved pattern: Remove trailing underscore to match "9618_..._1" AND "9618_..._1_a"
+    // ID format: 9618_s22_qp_11_1...
+    const idPrefix = `${code}_${seasonYear}_qp_${paper}_${qNum}`;
+    console.log(`Searching for ID prefix (broad): ${idPrefix}`);
     
     const { data, error } = await supabase
         .from('questions_data')
         .select('id, question_raw_number, start_y, end_y, start_page')
-        .filter('id', 'like', `${idPrefix}%`)
-        .order('start_y', { ascending: true });
+        .filter('id', 'like', `${idPrefix}%`) // Search broadly: _1, _10, _1_a
+        .order('start_page', { ascending: true }) // ORDER BY PAGE FIRST!
+        .order('start_y', { ascending: true });   // THEN BY Y
         
     if (error) {
         console.error("Error fetching siblings:", error);
         return [];
     }
     
-    console.log("Raw siblings data:", data);
+    console.log(`Raw siblings found: ${data.length}`);
+    if (data.length > 0) {
+        console.log("Sample raw ID:", data[0].id);
+    }
     
-    // Filter to ensure strict match on qNum
+    // Strict Filter: Ensure we only get Q1, not Q10, Q11, etc.
     const filtered = data.filter(item => {
         const parts = item.id.split('_');
-        // Check if 5th element (index 4) is exactly qNum
-        const isMatch = parts.length >= 5 && parts[4] === qNum;
+        if (parts.length < 5) return false;
+        
+        const isMatch = parts[4] === qNum;
+        
+        if (!isMatch) {
+            // Debug: Log why it failed (only first few times to avoid spam)
+            // e.g. qNum is '1', but parts[4] is '10'
+            if (Math.random() < 0.05) { 
+                console.log(`Rejected sibling: ${item.id} (parts[4]="${parts[4]}" != target="${qNum}")`);
+            }
+        }
+        
         return isMatch;
     });
     
-    console.log("Filtered siblings:", filtered);
+    console.log(`Filtered siblings count: ${filtered.length}`);
     return filtered;
 }
 
@@ -481,7 +497,9 @@ onMounted(() => {
                     @click="alert(`Current sub-question: ${sibling.question_raw_number}`)"
                     :title="sibling.question_raw_number"
                 >
-                    {{ sibling.question_raw_number.split('(').pop().replace(')', '') }}
+                    <!-- Display part after the main number. E.g. "1(b)(ii)" -> "(b)(ii)" -->
+                    <!-- Fallback: if no '(', just show the whole thing or last part -->
+                    {{ sibling.question_raw_number.includes('(') ? sibling.question_raw_number.substring(sibling.question_raw_number.indexOf('(')) : sibling.question_raw_number }}
                 </button>
              </div>
           </div>
@@ -622,15 +640,17 @@ body {
 }
 .subq-btn {
     position: absolute;
-    right: -50px; /* Push outside the image */
+    right: -60px; /* Push further out to accommodate width */
     transform: translateY(-50%); /* Center vertically on the coordinate */
     background-color: #3e635f;
     color: white;
     border: none;
-    border-radius: 50%;
-    width: 32px;
+    border-radius: 16px; /* Capsule shape */
+    min-width: 32px;
     height: 32px;
-    font-size: 14px;
+    padding: 0 8px; /* Horizontal padding for text */
+    font-size: 12px; /* Slightly smaller font */
+    font-weight: bold;
     cursor: pointer;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     display: flex;
@@ -638,6 +658,7 @@ body {
     justify-content: center;
     transition: transform 0.2s, background-color 0.2s;
     z-index: 10;
+    white-space: nowrap; /* Prevent wrapping */
 }
 .subq-btn:hover {
     transform: translateY(-50%) scale(1.1);
