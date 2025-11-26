@@ -84,41 +84,60 @@ async function fetchSiblings(code, seasonYear, paper, qNum) {
     return filtered;
 }
 
-// Calculate relative positions for buttons
+function handleSubQClick(sibling) {
+    alert(`Current sub-question: ${sibling.question_raw_number}`);
+}
+
+// Calculate relative positions for buttons, grouped by page index (0, 1, 2...)
 function calculateOverlayPositions(siblings) {
     console.log("calculateOverlayPositions called with:", siblings);
     
     if (!siblings || siblings.length === 0) return [];
     
-    const startPage = siblings[0].start_page;
-    const samePageSiblings = siblings.filter(s => s.start_page === startPage);
+    // Group by start_page
+    const pagesMap = {};
+    const startPage = siblings[0].start_page; // Base page (Index 0)
     
-    console.log("Same page siblings:", samePageSiblings);
-    
-    if (samePageSiblings.length === 0) return [];
-
-    const minY = Math.min(...samePageSiblings.map(s => s.start_y));
-    const maxY = Math.max(...samePageSiblings.map(s => s.end_y));
-    const totalHeight = maxY - minY;
-    
-    console.log(`Crop bounds: minY=${minY}, maxY=${maxY}, height=${totalHeight}`);
-    
-    return samePageSiblings.map(s => {
-        // Calculate position relative to the TOP of the crop (minY)
-        const subQMidY = (s.start_y + s.end_y) / 2;
-        const relativeTop = subQMidY - minY;
-        let percent = (relativeTop / totalHeight) * 100;
-        
-        // Clamp percentage to be safe
-        percent = Math.max(0, Math.min(100, percent));
-        
-        console.log(`SubQ ${s.id}: midY=${subQMidY}, relative=${relativeTop}, percent=${percent}%`);
-        
-        return {
-            ...s,
-            topPercent: percent
-        };
+    siblings.forEach(s => {
+        if (!pagesMap[s.start_page]) {
+            pagesMap[s.start_page] = [];
+        }
+        pagesMap[s.start_page].push(s);
     });
+    
+    // Result array where index 0 corresponds to _1.png, index 1 to _2.png, etc.
+    // We assume pages are continuous.
+    const result = [];
+    
+    Object.keys(pagesMap).sort().forEach(pageStr => {
+        const pageNum = parseInt(pageStr);
+        const pageSiblings = pagesMap[pageNum];
+        const pageIndex = pageNum - startPage; // 0-based index
+        
+        // Calculate bounds for THIS page specifically
+        const minY = Math.min(...pageSiblings.map(s => s.start_y));
+        const maxY = Math.max(...pageSiblings.map(s => s.end_y));
+        const totalHeight = maxY - minY;
+        
+        console.log(`Page ${pageNum} (Index ${pageIndex}) bounds: minY=${minY}, height=${totalHeight}`);
+        
+        const buttons = pageSiblings.map(s => {
+            const subQMidY = (s.start_y + s.end_y) / 2;
+            const relativeTop = subQMidY - minY;
+            let percent = (relativeTop / totalHeight) * 100;
+            percent = Math.max(0, Math.min(100, percent));
+            
+            return {
+                ...s,
+                topPercent: percent
+            };
+        });
+        
+        result[pageIndex] = buttons;
+    });
+    
+    console.log("Grouped Overlay Data:", result);
+    return result;
 }
 
 // Helper to recursively load multi-page images
@@ -487,18 +506,18 @@ onMounted(() => {
           <div v-for="(imgUrl, index) in images" :key="index" class="image-item" style="position: relative;">
              <img :src="imgUrl" alt="Supabase Image" />
              
-             <!-- Sub-question Overlay Buttons (Only show on QP mode and on the first page for now) -->
-             <div v-if="!isShowingAnswer && index === 0 && currentQuestionData && currentQuestionData.siblings" class="overlay-container">
+             <!-- Sub-question Overlay Buttons -->
+             <!-- Only show if we have data for this specific page index -->
+             <div v-if="!isShowingAnswer && currentQuestionData && currentQuestionData.siblings && currentQuestionData.siblings[index]" class="overlay-container">
                 <button 
-                    v-for="sibling in currentQuestionData.siblings" 
+                    v-for="sibling in currentQuestionData.siblings[index]" 
                     :key="sibling.id"
                     class="subq-btn"
                     :style="{ top: sibling.topPercent + '%' }"
-                    @click="alert(`Current sub-question: ${sibling.question_raw_number}`)"
+                    @click="handleSubQClick(sibling)"
                     :title="sibling.question_raw_number"
                 >
                     <!-- Display part after the main number. E.g. "1(b)(ii)" -> "(b)(ii)" -->
-                    <!-- Fallback: if no '(', just show the whole thing or last part -->
                     {{ sibling.question_raw_number.includes('(') ? sibling.question_raw_number.substring(sibling.question_raw_number.indexOf('(')) : sibling.question_raw_number }}
                 </button>
              </div>
