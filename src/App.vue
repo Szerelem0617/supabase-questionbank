@@ -5,7 +5,7 @@ import { store } from './store'
 import Auth from './components/Auth.vue'
 import Avatar from './components/Avatar.vue'
 
-import Guestbook from './components/Guestbook.vue'
+import Comment from './components/Comment.vue'
 
 // --- App State ---
 const showLoginPage = ref(false)
@@ -214,8 +214,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Guestbook Section -->
-    <Guestbook />
+    <!-- Comment Section -->
+    <Comment />
   </div>
 </template>
 

@@ -187,7 +187,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="guestbook-container">
+  <div class="comment-container">
     <h2>留言板 (Comments)</h2>
 
     <!-- Form for logged-in users -->
@@ -229,7 +229,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.guestbook-container {
+.comment-container {
   margin: 40px auto;
   padding: 24px;
   width: 90%;
