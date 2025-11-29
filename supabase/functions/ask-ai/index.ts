@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { questionText } = await req.json()
+    const { questionText, userPrompt, imageBase64, mimeType } = await req.json()
     
     // Debug: Check environment variables (safely)
     const key1 = Deno.env.get('google_ai_studio');
@@ -29,19 +29,49 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!questionText) {
+    if (!questionText && !userPrompt && !imageBase64) {
       return new Response(
-        JSON.stringify({ error: 'Missing questionText in request body.' }),
+        JSON.stringify({ error: 'Request must contain at least questionText, userPrompt, or imageBase64.' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    const prompt = `你是一个计算机科学专家辅助助手。
-请根据以下题目的文本内容，简要概括这道题的核心考点（Key Concepts）和内容摘要（Content Summary）。
-请用中文回答，字数控制在100字以内，保持简洁明了。
+    let fullText = `你是一个乐于助人的AI助手。
+请根据提供的上下文信息（如果有）、用户的问题或上传的图片进行回答。请用中文回答。
 
-题目内容：
-${questionText}`;
+`;
+
+    if (questionText) {
+        fullText += `相关题目/背景文本（供参考）：
+${questionText}
+
+`;
+    }
+
+    if (userPrompt) {
+        fullText += `用户的问题：
+${userPrompt}`;
+    } else if (imageBase64) {
+        // User uploaded an image but didn't type a specific question.
+        fullText += `任务：
+请详细描述并分析这张图片的内容。`;
+    } else {
+        // No prompt and no image, just context text.
+        fullText += `任务：
+请简要概括核心考点（Key Concepts）和内容摘要。`;
+    }
+
+    // Construct parts
+    const parts: any[] = [{ text: fullText }];
+
+    if (imageBase64) {
+        parts.push({
+            inline_data: {
+                mime_type: mimeType || 'image/png',
+                data: imageBase64
+            }
+        });
+    }
 
     // Try models in order of preference
     const models = ['gemini-2.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-pro'];
@@ -57,7 +87,7 @@ ${questionText}`;
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }]
+                    contents: [{ parts: parts }]
                 })
             });
 

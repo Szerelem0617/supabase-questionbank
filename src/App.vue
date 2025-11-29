@@ -4,11 +4,15 @@ import { supabase } from './supabase'
 import { store } from './store'
 import Auth from './components/Auth.vue'
 import Avatar from './components/Avatar.vue'
+import AskAIModal from './components/AskAIModal.vue'
 
 import Comment from './components/Comment.vue'
 
 // --- App State ---
 const showLoginPage = ref(false)
+const showAskModal = ref(false)
+const modalQNum = ref('')
+const modalContext = ref('')
 
 // --- Auth ---
 const session = ref(null)
@@ -85,42 +89,9 @@ async function fetchSiblings(code, seasonYear, paper, qNum) {
 }
 
 async function handleSubQClick(sibling) {
-    // alert(`Current sub-question: ${sibling.question_raw_number}`);
-    
-    const qNum = sibling.question_raw_number;
-    const qText = sibling.details || "No text details available for this question.";
-    
-    // Simple UI feedback (in a real app, use a modal or toast)
-    const userConfirmed = confirm(`Ask AI to explain Question ${qNum}?\n\nPreview: ${qText.substring(0, 50)}...`);
-    
-    if (!userConfirmed) return;
-    
-    // Show loading state (using alert is blocking, better to use a reactive variable, 
-    // but for this demo we'll just rely on the console or a quick 'Thinking...' alert that user closes)
-    // A better way: set a global 'aiThinking' state and show a spinner overlay.
-    // Let's use a simple prompt for now or just fire it.
-    
-    console.log("Asking AI...");
-    // To prevent blocking UI, we won't alert "Loading", but we can change the button cursor or something.
-    // Let's just fire and alert result.
-    
-    try {
-        const { data, error } = await supabase.functions.invoke('ask-ai', {
-            body: { questionText: qText }
-        });
-
-        if (error) throw error;
-        
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        
-        alert(`🤖 AI Analysis for ${qNum}:\n\n${data.answer}`);
-        
-    } catch (e) {
-        console.error("AI Error:", e);
-        alert(`Failed to ask AI: ${e.message}`);
-    }
+    modalQNum.value = sibling.question_raw_number;
+    modalContext.value = sibling.details || "No text details available for this question.";
+    showAskModal.value = true;
 }
 
 // Calculate relative positions for buttons, grouped by page index (0, 1, 2...)
@@ -513,6 +484,12 @@ onMounted(() => {
 </script>
 
 <template>
+  <AskAIModal 
+    :isOpen="showAskModal"
+    :questionNumber="modalQNum"
+    :contextText="modalContext"
+    @close="showAskModal = false"
+  />
   <Auth v-if="showLoginPage" @back="showLoginPage = false" />
   <div v-else class="app-container">
     <!-- Top bar for Authentication -->
