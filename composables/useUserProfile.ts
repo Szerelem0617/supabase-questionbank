@@ -115,9 +115,12 @@ export const useUserProfile = () => {
       // 2. Get Public URL
       const { data: urlData } = client.storage.from('avatars').getPublicUrl(filePath)
       
+      // Append timestamp to force cache busting
+      const publicUrl = `${urlData.publicUrl}?t=${new Date().getTime()}`
+
       const profileUpdates = {
         id: currentUser.id,
-        avatar_url: urlData.publicUrl,
+        avatar_url: publicUrl,
         updated_at: new Date(),
       }
 
