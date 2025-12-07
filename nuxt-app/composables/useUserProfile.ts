@@ -8,17 +8,23 @@ export const useUserProfile = () => {
 
   // --- Fetch Profile ---
   const fetchProfile = async () => {
-    if (!user.value) {
-        profile.value = null
-        return
-    }
-    
     try {
       loading.value = true
+      
+      // Mimic Vue store: Get session directly to ensure valid token
+      const { data: sessionData, error: sessionError } = await client.auth.getSession()
+      if (sessionError) throw sessionError
+      if (!sessionData.session) {
+          profile.value = null
+          return
+      }
+
+      const { user: currentUser } = sessionData.session
+
       const { data, error } = await client
         .from('profiles')
         .select(`username, website, avatar_url, display_name`)
-        .eq('id', user.value.id)
+        .eq('id', currentUser.id)
         .single()
 
       if (error) {
@@ -31,7 +37,7 @@ export const useUserProfile = () => {
       if (data) {
         profile.value = {
           ...data,
-          email: user.value.email,
+          email: currentUser.email,
         }
       }
     } catch (error: any) {
@@ -43,12 +49,15 @@ export const useUserProfile = () => {
 
   // --- Update Profile Info ---
   const updateProfile = async (profileData: { displayName: string, website: string }) => {
-    if (!user.value) return
-
     try {
       loading.value = true
+      
+      // Mimic Vue store: Get user directly
+      const { data: { user: currentUser }, error: userError } = await client.auth.getUser()
+      if (userError || !currentUser) throw new Error("User not found.")
+
       const updates = {
-        id: user.value.id,
+        id: currentUser.id,
         display_name: profileData.displayName,
         website: profileData.website,
         updated_at: new Date(),
@@ -64,11 +73,11 @@ export const useUserProfile = () => {
         profile.value.website = profileData.website
       } else {
         profile.value = {
-            username: user.value.email?.split('@')[0],
+            username: currentUser.email?.split('@')[0],
             avatar_url: '',
             display_name: profileData.displayName,
             website: profileData.website,
-            email: user.value.email
+            email: currentUser.email
         }
       }
       alert('Profile updated successfully!')
@@ -81,12 +90,15 @@ export const useUserProfile = () => {
 
   // --- Upload Avatar ---
   const uploadAvatar = async (file: File) => {
-    if (!user.value) return
-
     try {
       loading.value = true
+      
+      // Mimic Vue store: Get user directly
+      const { data: { user: currentUser }, error: userError } = await client.auth.getUser()
+      if (userError || !currentUser) throw new Error("User not found. Please log in again.")
+
       const fileExt = file.name.split('.').pop()
-      const fileName = `${user.value.id}.${fileExt}`
+      const fileName = `${currentUser.id}.${fileExt}`
       const filePath = `${fileName}`
 
       // 1. Upload to Storage
@@ -104,7 +116,7 @@ export const useUserProfile = () => {
       const { data: urlData } = client.storage.from('avatars').getPublicUrl(filePath)
       
       const profileUpdates = {
-        id: user.value.id,
+        id: currentUser.id,
         avatar_url: urlData.publicUrl,
         updated_at: new Date(),
       }
@@ -119,10 +131,10 @@ export const useUserProfile = () => {
       } else {
          profile.value = {
              ...profileUpdates,
-             email: user.value.email,
+             email: currentUser.email,
              display_name: '', // Default
              website: '',      // Default
-             username: user.value.email?.split('@')[0]
+             username: currentUser.email?.split('@')[0]
          }
       }
       alert('Avatar updated successfully!')

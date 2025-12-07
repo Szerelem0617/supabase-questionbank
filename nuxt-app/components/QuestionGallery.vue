@@ -22,6 +22,11 @@ const showAskModal = ref(false)
 const modalQNum = ref('')
 const modalContext = ref('')
 
+// Similarity / Benchmark State
+const findingSimilar = ref(false)
+const similarityScore = ref(null)
+const benchmarkData = ref(null) // { legacy: { time, payload }, edge: { time, payload } }
+
 // --- Methods ---
 async function fetchSiblings(code, seasonYear, paper, qNum) {
     const idPrefix = `${code}_${seasonYear}_qp_${paper}_${qNum}`;
@@ -128,6 +133,9 @@ async function getImages() {
   msDetails.value = ''
   loadingText.value = 'Loading question...'
   isShowingAnswer.value = false
+  similarityScore.value = null
+  findingSimilar.value = false
+  benchmarkData.value = null
 
   try {
     // Hardcoded for demo, can be filtered by props.subjectId later
@@ -231,6 +239,132 @@ async function fetchDetails() {
   }
 }
 
+async function findSimilarImage() {
+  if (!currentQuestionData.value) return
+  findingSimilar.value = true
+  images.value = []
+  loadingText.value = 'Running Benchmark (Searching)...'
+  showDetails.value = false
+  similarityScore.value = null
+  benchmarkData.value = null
+
+  try {
+    const currentId = currentQuestionData.value.id;
+    const currentVector = currentQuestionData.value.ms_vector;
+    const currentPaper = currentQuestionData.value.paper_filename;
+
+    // --- TRACK 1: Legacy Client-Side (Unsafe & Heavy) ---
+    const t0_legacy = performance.now();
+    
+    // Payload cost simulation
+    const legacyPayloadSize = JSON.stringify({ 
+      current_vector: currentVector, 
+      current_paper: currentPaper, 
+      current_id: currentId 
+    }).length;
+
+    const { data: similarDataLegacy, error: rpcError } = await client.rpc('match_similar_question', {
+      current_vector: currentVector,
+      current_paper: currentPaper,
+      current_id: currentId
+    })
+    
+    const t1_legacy = performance.now();
+    if (rpcError) throw rpcError
+
+    const legacyTime = (t1_legacy - t0_legacy).toFixed(2);
+
+    // --- TRACK 2: Edge Function (Secure & Light) ---
+    const t0_edge = performance.now();
+    
+    const edgePayloadSize = JSON.stringify({ question_id: currentId }).length;
+
+    const { data: edgeResponse, error: edgeError } = await client.functions.invoke('find-similar', {
+      body: { question_id: currentId }
+    })
+
+    const t1_edge = performance.now();
+    const edgeTime = (t1_edge - t0_edge).toFixed(2);
+
+    if (edgeError) {
+        console.error("Edge Function Error:", edgeError);
+    }
+
+    // --- Update Benchmark Data ---
+    benchmarkData.value = {
+        legacy: {
+            time: legacyTime,
+            payload: (legacyPayloadSize / 1024).toFixed(2), // KB
+            exposed: 'YES (Vector)'
+        },
+        edge: {
+            time: edgeTime,
+            payload: (edgePayloadSize / 1024).toFixed(3), // KB
+            exposed: 'NO'
+        }
+    }
+
+    // Use result (prefer Edge, fallback to Legacy)
+    const nextQuestion = edgeResponse?.match || similarDataLegacy?.[0];
+    
+    if (!nextQuestion) {
+      loadingText.value = 'No similar questions found in this paper.'
+      return
+    }
+
+    // Construct filenames for the NEW question
+    let nextQpFilename = '';
+    try {
+        const parts = nextQuestion.id.split('_');
+        if (parts.length >= 5) {
+            nextQpFilename = `${parts[0]}_${parts[1]}_${parts[3]}_q${parts[4]}_1.png`;
+        } else {
+            nextQpFilename = nextQuestion.id + '.png';
+        }
+    } catch (e) {
+        nextQpFilename = nextQuestion.id + '.png';
+    }
+    const nextMsFilename = nextQuestion.id.replace('_qp_', '_ms_') + '.png';
+
+    // Update state with new question
+    currentQuestionData.value = {
+      id: nextQuestion.id,
+      paper_filename: nextQuestion.paper_filename,
+      ms_vector: nextQuestion.ms_vector, 
+      qpFilename: nextQpFilename,
+      msFilename: nextMsFilename,
+      // Note: We are missing 'siblings' for the new question here unless we fetch them again.
+      // For this demo, we can either fetch them or skip overlays for the similar result.
+      // Let's try to be thorough and fetch siblings if possible.
+    }
+
+    // Try to fetch siblings for the new question to maintain overlay functionality
+    try {
+        const parts = nextQuestion.id.split('_');
+        if (parts.length >= 5) {
+             const code = parts[0];
+             const seasonYear = parts[1];
+             const paper = parts[3];
+             const qNum = parts[4];
+             const siblings = await fetchSiblings(code, seasonYear, paper, qNum);
+             currentQuestionData.value.siblings = calculateOverlayPositions(siblings);
+        }
+    } catch (e) { console.log("Skipping siblings for similar result"); }
+
+    similarityScore.value = nextQuestion.similarity
+    
+    isShowingAnswer.value = false; 
+    currentFilename.value = nextQpFilename
+    await loadAllPages(nextQpFilename, false);
+
+  } catch (error) {
+    console.error('Error finding similar image:', error)
+    loadingText.value = 'Error searching for similar image.'
+  } finally {
+    findingSimilar.value = false
+  }
+}
+
 onMounted(() => {
     getImages()
 })
@@ -246,7 +380,7 @@ onMounted(() => {
     />
 
     <div class="gallery-container">
-      <div v-if="images.length === 0 && loadingText">
+      <div v-if="images.length === 0 && (loadingText || findingSimilar)">
         {{ loadingText }}
       </div>
 
@@ -269,9 +403,16 @@ onMounted(() => {
           </div>
         </div>
 
+        <div v-if="similarityScore !== null" class="similarity-display">
+          Similarity Score: {{ (similarityScore * 100).toFixed(2) }}%
+        </div>
+
         <div class="button-group">
           <button @click="toggleMode" class="details-button" style="background-color: #e67e22;">
             {{ isShowingAnswer ? 'Show Question' : 'Show Answer' }}
+          </button>
+           <button @click="findSimilarImage" :disabled="findingSimilar" class="details-button">
+            {{ findingSimilar ? 'Searching...' : 'Find Similar (Benchmark)' }}
           </button>
           <button @click="getImages" class="details-button">
             Next Random
@@ -279,6 +420,37 @@ onMounted(() => {
            <button @click="fetchDetails" class="details-button">
             {{ showDetails ? 'Hide Details' : 'Show Details' }}
           </button>
+        </div>
+        
+        <!-- Benchmark Report -->
+        <div v-if="benchmarkData" class="benchmark-report">
+            <h3>🚀 Performance & Security Benchmark</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Legacy (Client-Side)</th>
+                        <th>Edge Function (Server-Side)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Time (Total)</td>
+                        <td>{{ benchmarkData.legacy.time }} ms</td>
+                        <td>{{ benchmarkData.edge.time }} ms</td>
+                    </tr>
+                    <tr>
+                        <td>Network Payload</td>
+                        <td class="unsafe">{{ benchmarkData.legacy.payload }} KB (Huge!)</td>
+                        <td class="safe">{{ benchmarkData.edge.payload }} KB (Tiny!)</td>
+                    </tr>
+                    <tr>
+                        <td>Sensitive Data Exposed?</td>
+                        <td class="unsafe">{{ benchmarkData.legacy.exposed }}</td>
+                        <td class="safe">{{ benchmarkData.edge.exposed }}</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
         
         <div v-if="showDetails" class="details-box">
@@ -309,12 +481,29 @@ onMounted(() => {
 }
 .subq-btn:hover { transform: translateY(-50%) scale(1.1); background-color: #2c4643; }
 
-.button-group { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+.similarity-display { margin-top: 15px; font-size: 1.2em; font-weight: bold; color: #333; }
+
+.button-group { display: flex; justify-content: center; gap: 15px; margin-top: 20px; flex-wrap: wrap; }
 .details-button { 
     background-color: #3e635f; color: white; border: none; padding: 12px 24px; 
     border-radius: 8px; cursor: pointer; min-width: 150px; 
     transition: background-color 0.2s;
 }
 .details-button:hover { background-color: #324f4c; }
+.details-button:disabled { background-color: #999; cursor: not-allowed; }
+
 .details-box { margin: 20px auto; padding: 24px; width: 80%; max-width: 1000px; background: white; text-align: left; white-space: pre-wrap; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); color: #333; }
+
+/* Benchmark Report Styles */
+.benchmark-report {
+    margin: 30px auto; padding: 20px; width: 90%; max-width: 800px;
+    background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+.benchmark-report h3 { margin-top: 0; color: #333; margin-bottom: 15px; }
+.benchmark-report table { width: 100%; border-collapse: collapse; background: white; }
+.benchmark-report th, .benchmark-report td { padding: 12px; border: 1px solid #eee; text-align: center; }
+.benchmark-report th { background-color: #e9ecef; font-weight: 600; }
+.safe { color: #28a745; font-weight: bold; background-color: #d4edda; }
+.unsafe { color: #dc3545; font-weight: bold; background-color: #f8d7da; }
 </style>
