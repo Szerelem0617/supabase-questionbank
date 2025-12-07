@@ -1,0 +1,6 @@
+schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
+storage,objects,Authenticated users can upload avatars,PERMISSIVE,{authenticated},INSERT,null,"((bucket_id = 'avatars'::text) AND ((auth.uid())::text = split_part(name, '.'::text, 1)))"
+storage,objects,Public read access for all objects,PERMISSIVE,{public},SELECT,(bucket_id = 'bucket'::text),null
+storage,objects,Public read access for avatars,PERMISSIVE,{public},SELECT,(bucket_id = 'avatars'::text),null
+storage,objects,Public read access for main gallery bucket,PERMISSIVE,{public},SELECT,(bucket_id = 'bucket'::text),null
+storage,objects,Users can update their own avatar,PERMISSIVE,{authenticated},UPDATE,"((bucket_id = 'avatars'::text) AND ((auth.uid())::text = split_part(name, '.'::text, 1)))",null

@@ -1,2 +1,0 @@
-schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
-storage,objects,Public read access for all objects,PERMISSIVE,{public},SELECT,(bucket_id = 'bucket'::text),null
