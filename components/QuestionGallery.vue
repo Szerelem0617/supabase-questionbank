@@ -16,13 +16,17 @@ const cdnBase = computed(() => config.public.cdnBaseUrl || 'https://assets.66367
 const loading = ref(true)
 const loadingText = ref('Loading questions...')
 const currentQuestionData = ref(null)
-const isShowingAnswer = ref(false)
-const imageLoading = ref(true)
-const showDetails = ref(false)
-const detailsLoading = ref(false)
-const msDetails = ref('')
+const groupQuestions = ref([]) // All subquestions belonging to the active main question
+const isSqGroup = computed(() => groupQuestions.value.length > 0 && currentQuestionData.value?.paper_type === 'SQ')
 
-// Filters
+// Subquestion individual states
+const expandedAnswers = ref({}) // { [subQId]: boolean }
+const expandedComments = ref({}) // { [subQId]: boolean }
+const subQComments = ref({}) // { [subQId]: [] }
+const newCommentText = ref({}) // { [subQId]: string }
+const submittingComment = ref({}) // { [subQId]: boolean }
+
+// Filter & Navigation
 const paperTypeFilter = ref('ALL') // 'ALL' | 'SQ' | 'MCQ'
 const selectedPaper = ref('')
 const availablePapers = ref([])
@@ -30,35 +34,53 @@ const questionList = ref([]) // Current pool of question IDs
 const currentIndex = ref(0)
 const totalCount = ref(0)
 
+// Search State
+const searchKeyword = ref('')
+const isSearching = ref(false)
+const searchResults = ref([])
+const showSearchResults = ref(false)
+
 // AI Modal State
 const showAskModal = ref(false)
 const modalQNum = ref('')
 const modalContext = ref('')
 
-// Computed Display Image URL
-const currentImageUrl = computed(() => {
-  if (!currentQuestionData.value) return ''
-  if (isShowingAnswer.value) {
-    if (currentQuestionData.value.ms_image_path) {
-      return `${cdnBase.value}/${currentQuestionData.value.ms_image_path}`
-    }
-    return '' // No MS image (e.g. MCQ)
-  }
-  return currentQuestionData.value.image_path ? `${cdnBase.value}/${currentQuestionData.value.image_path}` : ''
-})
+// Toast Notification
+const toastMessage = ref('')
+const showToastNotification = ref(false)
+let toastTimer = null
+
+function showToast(msg) {
+  toastMessage.value = msg
+  showToastNotification.value = true
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    showToastNotification.value = false
+  }, 3000)
+}
+
+// Copy Image State
+const copyingImage = ref(false)
+
+// --- Helper Functions ---
+function getMainQuestionNumber(raw) {
+  if (!raw) return ''
+  const str = String(raw).trim()
+  const match = str.match(/^(\d+)/)
+  return match ? match[1] : str
+}
 
 // --- Methods ---
 
 // 1. Fetch available papers for this series
 async function fetchPapers() {
   try {
-    let query = client
+    const { data, error } = await client
       .from('questions_data')
       .select('paper_filename')
       .eq('series', props.subjectId)
       .neq('paper_filename', '')
 
-    const { data, error } = await query
     if (error) throw error
 
     if (data) {
@@ -70,14 +92,14 @@ async function fetchPapers() {
   }
 }
 
-// 2. Fetch Question IDs matching current filters
+// 2. Load Question Pool
 async function loadQuestionPool() {
   loading.value = true
   loadingText.value = 'Fetching question list...'
   try {
     let query = client
       .from('questions_data')
-      .select('id, question_raw_number, score, paper_type')
+      .select('id, question_raw_number, score, paper_type, paper_filename')
       .eq('series', props.subjectId)
 
     if (paperTypeFilter.value !== 'ALL') {
@@ -88,7 +110,7 @@ async function loadQuestionPool() {
       query = query.eq('paper_filename', selectedPaper.value)
     }
 
-    query = query.limit(500) // load a good chunk
+    query = query.limit(500)
 
     const { data, error } = await query
     if (error) throw error
@@ -97,11 +119,11 @@ async function loadQuestionPool() {
     totalCount.value = questionList.value.length
 
     if (questionList.value.length > 0) {
-      // Pick first or random
       currentIndex.value = 0
       await loadQuestionById(questionList.value[0].id)
     } else {
       currentQuestionData.value = null
+      groupQuestions.value = []
       loadingText.value = 'No questions found for the selected filters.'
       loading.value = false
     }
@@ -112,15 +134,14 @@ async function loadQuestionPool() {
   }
 }
 
-// 3. Load specific question by ID
+// 3. Load specific question and resolve its SQ Group
 async function loadQuestionById(id) {
   loading.value = true
-  imageLoading.value = true
-  isShowingAnswer.value = false
-  showDetails.value = false
+  expandedAnswers.value = {}
+  expandedComments.value = {}
 
   try {
-    const { data, error } = await client
+    const { data: primaryQ, error } = await client
       .from('questions_data')
       .select('*')
       .eq('id', id)
@@ -128,7 +149,33 @@ async function loadQuestionById(id) {
 
     if (error) throw error
 
-    currentQuestionData.value = data
+    currentQuestionData.value = primaryQ
+
+    // If it's a Structured Question (SQ), fetch all siblings belonging to this main question!
+    if (primaryQ.paper_type === 'SQ' && primaryQ.paper_filename) {
+      const mainNum = getMainQuestionNumber(primaryQ.question_raw_number)
+      
+      const { data: siblings, error: sibError } = await client
+        .from('questions_data')
+        .select('*')
+        .eq('paper_filename', primaryQ.paper_filename)
+        .eq('paper_type', 'SQ')
+        .order('start_page', { ascending: true })
+        .order('start_y', { ascending: true })
+
+      if (!sibError && siblings && siblings.length > 0) {
+        // Filter siblings that share the same main question number
+        const matchedSiblings = siblings.filter(s => {
+          return getMainQuestionNumber(s.question_raw_number) === mainNum
+        })
+        groupQuestions.value = matchedSiblings.length > 0 ? matchedSiblings : [primaryQ]
+      } else {
+        groupQuestions.value = [primaryQ]
+      }
+    } else {
+      // MCQ or standalone
+      groupQuestions.value = [primaryQ]
+    }
   } catch (err) {
     console.error('Error loading question:', err)
     loadingText.value = `Failed to load question details: ${err.message}`
@@ -165,30 +212,224 @@ function randomQuestion() {
   loadQuestionById(questionList.value[randIdx].id)
 }
 
-// 5. Actions
-function toggleAnswer() {
-  isShowingAnswer.value = !isShowingAnswer.value
-  imageLoading.value = true
+// 5. Subquestion Mark Scheme Controls
+function toggleSubQAnswer(subQId) {
+  expandedAnswers.value[subQId] = !expandedAnswers.value[subQId]
 }
 
-function toggleDetails() {
-  showDetails.value = !showDetails.value
+function expandAllAnswers() {
+  groupQuestions.value.forEach(q => {
+    expandedAnswers.value[q.id] = true
+  })
 }
 
-function openAskAI() {
-  if (!currentQuestionData.value) return
-  modalQNum.value = currentQuestionData.value.question_raw_number || ''
-  modalContext.value = currentQuestionData.value.details || ''
+function collapseAllAnswers() {
+  expandedAnswers.value = {}
+}
+
+// 6. Search Functionality
+async function handleSearch() {
+  const kw = searchKeyword.value.trim()
+  if (!kw) {
+    showSearchResults.value = false
+    await loadQuestionPool()
+    return
+  }
+
+  isSearching.value = true
+  showSearchResults.value = true
+  try {
+    const { data, error } = await client
+      .from('questions_data')
+      .select('id, question_raw_number, score, paper_type, paper_filename, series, details, image_path, ms_image_path')
+      .or(`details.ilike.%${kw}%,paper_filename.ilike.%${kw}%,question_raw_number.ilike.%${kw}%`)
+      .limit(30)
+
+    if (error) throw error
+    searchResults.value = data || []
+  } catch (err) {
+    console.error('Search error:', err)
+    showToast('Search failed: ' + err.message)
+  } finally {
+    isSearching.value = false
+  }
+}
+
+function selectSearchResult(item) {
+  showSearchResults.value = false
+  loadQuestionById(item.id)
+}
+
+// 7. Stitched Image Copy (Adapted from siyuan-plugin-edu copySqGroup)
+async function copyStitchedQuestion() {
+  const validQuestions = groupQuestions.value.filter(q => q.image_path)
+  if (validQuestions.length === 0) {
+    showToast('⚠️ No question images available to copy.')
+    return
+  }
+
+  copyingImage.value = true
+  showToast('⏳ Stitching question images...')
+
+  try {
+    // Load all images via CORS-enabled Image objects
+    const loadedImgs = await Promise.all(
+      validQuestions.map(q => {
+        return new Promise((resolve, reject) => {
+          const img = new Image()
+          img.crossOrigin = 'anonymous'
+          img.onload = () => resolve(img)
+          img.onerror = () => reject(new Error(`Failed to load ${q.image_path}`))
+          img.src = `${cdnBase.value}/${q.image_path}`
+        })
+      })
+    )
+
+    const totalHeight = loadedImgs.reduce((sum, img) => sum + img.height, 0)
+    const maxWidth = Math.max(...loadedImgs.map(img => img.width))
+
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Could not create canvas context')
+
+    // Single column if totalHeight <= 1800px or only 1 image
+    if (totalHeight <= 1800 || loadedImgs.length === 1) {
+      canvas.width = maxWidth
+      canvas.height = totalHeight
+
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      let currentY = 0
+      for (const img of loadedImgs) {
+        ctx.drawImage(img, 0, currentY)
+        currentY += img.height
+      }
+    } else {
+      // Two balanced columns (Left / Right)
+      const heights = loadedImgs.map(img => img.height)
+      const n = loadedImgs.length
+
+      let bestSplitIndex = 0
+      let minDiff = Infinity
+      for (let i = 0; i < n - 1; i++) {
+        const leftH = heights.slice(0, i + 1).reduce((a, b) => a + b, 0)
+        const rightH = heights.slice(i + 1).reduce((a, b) => a + b, 0)
+        const diff = Math.abs(leftH - rightH)
+        if (diff < minDiff) {
+          minDiff = diff
+          bestSplitIndex = i
+        }
+      }
+
+      const leftGroup = loadedImgs.slice(0, bestSplitIndex + 1)
+      const rightGroup = loadedImgs.slice(bestSplitIndex + 1)
+
+      const leftHeight = leftGroup.reduce((sum, img) => sum + img.height, 0)
+      const rightHeight = rightGroup.reduce((sum, img) => sum + img.height, 0)
+      const leftWidth = Math.max(...leftGroup.map(img => img.width))
+      const rightWidth = Math.max(...rightGroup.map(img => img.width))
+
+      const gap = 24
+      canvas.width = leftWidth + gap + rightWidth
+      canvas.height = Math.max(leftHeight, rightHeight)
+
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      let leftY = 0
+      for (const img of leftGroup) {
+        ctx.drawImage(img, 0, leftY)
+        leftY += img.height
+      }
+
+      let rightY = 0
+      for (const img of rightGroup) {
+        ctx.drawImage(img, leftWidth + gap, rightY)
+        rightY += img.height
+      }
+    }
+
+    // Write to clipboard as PNG
+    canvas.toBlob(async (blob) => {
+      if (!blob) throw new Error('Canvas conversion to blob failed')
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ])
+      showToast('✅ 整题切图已成功拼接并复制到剪贴板！可直接粘贴。')
+    }, 'image/png')
+  } catch (err) {
+    console.error('Failed to copy stitched image:', err)
+    showToast('❌ 复制切图失败: ' + err.message)
+  } finally {
+    copyingImage.value = false
+  }
+}
+
+// 8. Subquestion Comments
+async function toggleSubQComment(subQId) {
+  expandedComments.value[subQId] = !expandedComments.value[subQId]
+  if (expandedComments.value[subQId] && !subQComments.value[subQId]) {
+    await fetchSubQComments(subQId)
+  }
+}
+
+async function fetchSubQComments(subQId) {
+  try {
+    const { data, error } = await client
+      .from('comments')
+      .select('id, created_at, message, user_id, question_id, profiles(display_name, avatar_url)')
+      .eq('question_id', subQId)
+      .order('created_at', { ascending: true })
+
+    if (!error && data) {
+      subQComments.value[subQId] = data
+    } else {
+      subQComments.value[subQId] = []
+    }
+  } catch (err) {
+    console.error('Error fetching subQ comments:', err)
+    subQComments.value[subQId] = []
+  }
+}
+
+async function addSubQComment(subQ) {
+  const text = (newCommentText.value[subQ.id] || '').trim()
+  if (!text) return
+
+  submittingComment.value[subQ.id] = true
+  try {
+    const { data: { user } } = await client.auth.getUser()
+    if (!user) {
+      showToast('⚠️ Please log in to post comments or notes.')
+      return
+    }
+
+    const { error } = await client.from('comments').insert({
+      message: text,
+      user_id: user.id,
+      question_id: subQ.id,
+      sub_q_number: subQ.question_raw_number
+    })
+
+    if (error) throw error
+
+    newCommentText.value[subQ.id] = ''
+    await fetchSubQComments(subQ.id)
+    showToast('💬 Note posted successfully!')
+  } catch (err) {
+    console.error('Error posting comment:', err)
+    showToast('Failed to post: ' + err.message)
+  } finally {
+    submittingComment.value[subQ.id] = false
+  }
+}
+
+// 9. AI Tutor Modal Trigger
+function openAskAI(subQ) {
+  modalQNum.value = subQ?.question_raw_number || currentQuestionData.value?.question_raw_number || ''
+  modalContext.value = subQ?.details || currentQuestionData.value?.details || ''
   showAskModal.value = true
-}
-
-function onImageLoad() {
-  imageLoading.value = false
-}
-
-function onImageError() {
-  imageLoading.value = false
-  console.warn('Failed to load image from CDN:', currentImageUrl.value)
 }
 
 // Watch filters
@@ -203,6 +444,8 @@ watch(selectedPaper, () => {
 watch(() => props.subjectId, async () => {
   selectedPaper.value = ''
   paperTypeFilter.value = 'ALL'
+  searchKeyword.value = ''
+  showSearchResults.value = false
   await fetchPapers()
   await loadQuestionPool()
 })
@@ -215,6 +458,13 @@ onMounted(async () => {
 
 <template>
   <div class="gallery-wrapper">
+    <!-- Floating Toast Notification -->
+    <transition name="toast-fade">
+      <div v-if="showToastNotification" class="toast-popup">
+        {{ toastMessage }}
+      </div>
+    </transition>
+
     <AskAIModal 
       :isOpen="showAskModal"
       :questionNumber="modalQNum"
@@ -222,53 +472,101 @@ onMounted(async () => {
       @close="showAskModal = false"
     />
 
-    <!-- Filter & Control Bar -->
+    <!-- Top Search & Filter Bar -->
     <div class="control-panel">
-      <div class="filters">
-        <div class="filter-group">
-          <label>Type:</label>
-          <div class="pill-tabs">
-            <button 
-              :class="{ active: paperTypeFilter === 'ALL' }" 
-              @click="paperTypeFilter = 'ALL'"
-            >All</button>
-            <button 
-              :class="{ active: paperTypeFilter === 'SQ' }" 
-              @click="paperTypeFilter = 'SQ'"
-            >Structured (SQ)</button>
-            <button 
-              :class="{ active: paperTypeFilter === 'MCQ' }" 
-              @click="paperTypeFilter = 'MCQ'"
-            >Multiple Choice (MCQ)</button>
+      <!-- Search Input Section -->
+      <div class="search-section">
+        <div class="search-input-wrapper">
+          <span class="search-icon">🔍</span>
+          <input 
+            v-model="searchKeyword" 
+            type="text" 
+            placeholder="Search questions by keyword, topic, paper or year (e.g. circuit, momentum, 2022)..."
+            class="search-input"
+            @keyup.enter="handleSearch"
+          />
+          <button v-if="searchKeyword" @click="searchKeyword = ''; handleSearch()" class="search-clear-btn">&times;</button>
+          <button @click="handleSearch" :disabled="isSearching" class="btn btn-search">
+            {{ isSearching ? 'Searching...' : 'Search' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Filters & Controls -->
+      <div class="filter-controls-row">
+        <div class="filters">
+          <div class="filter-group">
+            <label>Type:</label>
+            <div class="pill-tabs">
+              <button 
+                :class="{ active: paperTypeFilter === 'ALL' }" 
+                @click="paperTypeFilter = 'ALL'"
+              >All</button>
+              <button 
+                :class="{ active: paperTypeFilter === 'SQ' }" 
+                @click="paperTypeFilter = 'SQ'"
+              >Structured (SQ)</button>
+              <button 
+                :class="{ active: paperTypeFilter === 'MCQ' }" 
+                @click="paperTypeFilter = 'MCQ'"
+              >Multiple Choice (MCQ)</button>
+            </div>
+          </div>
+
+          <div class="filter-group paper-select-group" v-if="availablePapers.length > 0">
+            <label>Paper:</label>
+            <select v-model="selectedPaper" class="paper-select">
+              <option value="">All Papers ({{ availablePapers.length }})</option>
+              <option v-for="p in availablePapers" :key="p" :value="p">{{ p }}</option>
+            </select>
           </div>
         </div>
 
-        <div class="filter-group paper-select-group" v-if="availablePapers.length > 0">
-          <label>Paper:</label>
-          <select v-model="selectedPaper" class="paper-select">
-            <option value="">All Papers ({{ availablePapers.length }})</option>
-            <option v-for="p in availablePapers" :key="p" :value="p">{{ p }}</option>
-          </select>
+        <div class="nav-controls">
+          <span class="count-badge" v-if="questionList.length > 0">
+            {{ currentIndex + 1 }} / {{ questionList.length }}
+          </span>
+          <button @click="prevQuestion" :disabled="loading || questionList.length <= 1" class="btn btn-secondary">
+            &larr; Prev
+          </button>
+          <button @click="nextQuestion" :disabled="loading || questionList.length <= 1" class="btn btn-secondary">
+            Next &rarr;
+          </button>
+          <button @click="randomQuestion" :disabled="loading || questionList.length <= 1" class="btn btn-primary">
+            🎲 Random
+          </button>
         </div>
-      </div>
-
-      <div class="nav-controls">
-        <span class="count-badge" v-if="questionList.length > 0">
-          {{ currentIndex + 1 }} / {{ questionList.length }}
-        </span>
-        <button @click="prevQuestion" :disabled="loading || questionList.length <= 1" class="btn btn-secondary">
-          &larr; Prev
-        </button>
-        <button @click="nextQuestion" :disabled="loading || questionList.length <= 1" class="btn btn-secondary">
-          Next &rarr;
-        </button>
-        <button @click="randomQuestion" :disabled="loading || questionList.length <= 1" class="btn btn-primary">
-          🎲 Random
-        </button>
       </div>
     </div>
 
-    <!-- Question Viewport -->
+    <!-- Search Results Flyout Drawer -->
+    <div v-if="showSearchResults" class="search-results-panel">
+      <div class="search-results-header">
+        <h4>Search Results ({{ searchResults.length }} matches)</h4>
+        <button @click="showSearchResults = false" class="close-results-btn">&times;</button>
+      </div>
+      <div v-if="searchResults.length === 0" class="no-results">
+        No questions matched your search query.
+      </div>
+      <div v-else class="results-list">
+        <div 
+          v-for="res in searchResults" 
+          :key="res.id"
+          class="result-card"
+          @click="selectSearchResult(res)"
+        >
+          <div class="result-top">
+            <span class="tag tag-series">{{ res.series }}</span>
+            <span class="tag tag-paper">{{ res.paper_filename }}</span>
+            <span class="tag tag-qnum">Q: {{ res.question_raw_number }}</span>
+            <span class="tag tag-score" v-if="res.score">[{{ res.score }}m]</span>
+          </div>
+          <p class="result-snippet">{{ res.details ? res.details.slice(0, 160) + '...' : 'No text preview' }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Question Viewport Card -->
     <div class="viewport-card">
       <div v-if="loading" class="state-container">
         <div class="spinner"></div>
@@ -277,85 +575,195 @@ onMounted(async () => {
 
       <div v-else-if="!currentQuestionData" class="state-container empty">
         <p>No questions found matching your filter.</p>
-        <button @click="paperTypeFilter = 'ALL'; selectedPaper = ''" class="btn btn-primary">
+        <button @click="paperTypeFilter = 'ALL'; selectedPaper = ''; searchKeyword = ''; handleSearch()" class="btn btn-primary">
           Reset Filters
         </button>
       </div>
 
-      <div v-else class="question-content">
-        <!-- Metadata Header -->
-        <div class="question-meta-bar">
-          <div class="meta-left">
-            <span class="tag tag-series">{{ currentQuestionData.series }}</span>
-            <span class="tag tag-paper">{{ currentQuestionData.paper_filename }}</span>
-            <span class="tag tag-qnum">Q: {{ currentQuestionData.question_raw_number }}</span>
-            <span class="tag tag-score" v-if="currentQuestionData.score">
-              [{{ currentQuestionData.score }} {{ currentQuestionData.score > 1 ? 'marks' : 'mark' }}]
-            </span>
+      <div v-else class="question-container">
+        <!-- Main Question Global Header -->
+        <div class="main-q-header">
+          <div class="header-info">
+            <div class="header-tags">
+              <span class="tag tag-series">{{ currentQuestionData.series }}</span>
+              <span class="tag tag-paper">{{ currentQuestionData.paper_filename }}</span>
+              <span class="tag tag-type-badge">{{ currentQuestionData.paper_type }}</span>
+            </div>
+            <h2 class="main-q-title">
+              <span v-if="currentQuestionData.paper_type === 'SQ'">
+                Question {{ getMainQuestionNumber(currentQuestionData.question_raw_number) }}
+                <span class="subparts-count">({{ groupQuestions.length }} subparts)</span>
+              </span>
+              <span v-else>
+                Question {{ currentQuestionData.question_raw_number }}
+              </span>
+            </h2>
           </div>
 
-          <div class="meta-right">
+          <!-- Global Action Buttons -->
+          <div class="header-actions">
+            <!-- Copy Stitched Question Button -->
             <button 
-              v-if="currentQuestionData.ms_image_path || currentQuestionData.ms_details"
-              @click="toggleAnswer" 
-              class="btn"
-              :class="isShowingAnswer ? 'btn-warn' : 'btn-accent'"
+              @click="copyStitchedQuestion" 
+              :disabled="copyingImage" 
+              class="btn btn-stitch"
+              title="Stitch and copy full question image to clipboard"
             >
-              {{ isShowingAnswer ? '📖 Show Question' : '💡 Show Mark Scheme' }}
+              📋 {{ copyingImage ? 'Stitching...' : '复制整题切图' }}
             </button>
-            <button @click="openAskAI" class="btn btn-ai">
-              🤖 Ask AI Tutor
-            </button>
-            <button @click="toggleDetails" class="btn btn-text">
-              {{ showDetails ? 'Hide OCR' : 'Inspect OCR' }}
-            </button>
+
+            <!-- SQ Batch Toggle Answers -->
+            <template v-if="currentQuestionData.paper_type === 'SQ'">
+              <button @click="expandAllAnswers" class="btn btn-secondary">
+                💡 展开全部答案
+              </button>
+              <button @click="collapseAllAnswers" class="btn btn-secondary">
+                📖 收起全部答案
+              </button>
+            </template>
           </div>
         </div>
 
-        <!-- Mode Indicator Banner -->
-        <div v-if="isShowingAnswer" class="answer-banner">
-          <span>✨ Viewing Official Mark Scheme / Answer</span>
-          <span v-if="currentQuestionData.paper_type === 'MCQ' && currentQuestionData.ms_details" class="mcq-answer">
-            {{ currentQuestionData.ms_details }}
-          </span>
-        </div>
+        <!-- ================= SQ: MULTI-PART FULL QUESTION DISPLAY ================= -->
+        <div v-if="currentQuestionData.paper_type === 'SQ'" class="sq-group-stream">
+          <div 
+            v-for="(subQ, idx) in groupQuestions" 
+            :key="subQ.id" 
+            class="subq-block"
+          >
+            <!-- Subquestion Top Action Bar -->
+            <div class="subq-bar">
+              <div class="subq-meta">
+                <span class="subq-pill">{{ subQ.question_raw_number }}</span>
+                <span class="subq-score" v-if="subQ.score">[{{ subQ.score }} {{ subQ.score > 1 ? 'marks' : 'mark' }}]</span>
+              </div>
 
-        <!-- Image Container -->
-        <div class="image-stage">
-          <div v-if="imageLoading" class="image-loader">
-            <div class="spinner-sm"></div>
-            <span>Loading image from Cloudflare CDN...</span>
-          </div>
+              <div class="subq-tools">
+                <!-- Toggle Individual Mark Scheme -->
+                <button 
+                  v-if="subQ.ms_image_path || subQ.ms_details"
+                  @click="toggleSubQAnswer(subQ.id)" 
+                  class="btn btn-sm"
+                  :class="expandedAnswers[subQ.id] ? 'btn-warn' : 'btn-accent'"
+                >
+                  {{ expandedAnswers[subQ.id] ? '💡 收起答案' : '💡 查看答案' }}
+                </button>
 
-          <div v-if="isShowingAnswer && !currentQuestionData.ms_image_path && currentQuestionData.ms_details" class="text-answer-box">
-            <h3>Multiple Choice Correct Answer</h3>
-            <div class="answer-highlight">{{ currentQuestionData.ms_details }}</div>
-          </div>
+                <!-- Subquestion Notes / Comments -->
+                <button 
+                  @click="toggleSubQComment(subQ.id)" 
+                  class="btn btn-sm btn-text"
+                  :class="{ 'btn-active': expandedComments[subQ.id] }"
+                >
+                  💬 笔记/讨论 {{ subQComments[subQ.id]?.length ? `(${subQComments[subQ.id].length})` : '' }}
+                </button>
 
-          <img 
-            v-if="currentImageUrl"
-            :src="currentImageUrl" 
-            :alt="isShowingAnswer ? 'Mark Scheme' : 'Question Image'"
-            class="exam-image"
-            @load="onImageLoad"
-            @error="onImageError"
-          />
-        </div>
-
-        <!-- OCR Text Drawer -->
-        <div v-if="showDetails" class="ocr-drawer">
-          <div class="drawer-header">
-            <h4>Extracted Question & Mark Scheme Text</h4>
-          </div>
-          <div class="drawer-body">
-            <div class="ocr-section">
-              <h5>Question Text:</h5>
-              <pre>{{ currentQuestionData.details || 'No text extracted' }}</pre>
+                <!-- Ask AI Tutor -->
+                <button @click="openAskAI(subQ)" class="btn btn-sm btn-ai">
+                  🤖 AI 答疑
+                </button>
+              </div>
             </div>
-            <div class="ocr-section" v-if="currentQuestionData.ms_details">
-              <h5>Mark Scheme Text:</h5>
-              <pre>{{ currentQuestionData.ms_details }}</pre>
+
+            <!-- Subquestion Question Slice Image -->
+            <div class="subq-image-box">
+              <img 
+                v-if="subQ.image_path"
+                :src="`${cdnBase}/${subQ.image_path}`" 
+                :alt="`Sub-question ${subQ.question_raw_number}`"
+                class="exam-image"
+                loading="lazy"
+              />
             </div>
+
+            <!-- Subquestion Expanded Mark Scheme -->
+            <transition name="slide-fade">
+              <div v-if="expandedAnswers[subQ.id]" class="subq-ms-box">
+                <div class="ms-label">
+                  <span>✨ 官方评分标准 (Mark Scheme - {{ subQ.question_raw_number }})</span>
+                </div>
+                <img 
+                  v-if="subQ.ms_image_path"
+                  :src="`${cdnBase}/${subQ.ms_image_path}`" 
+                  alt="Mark Scheme"
+                  class="exam-ms-image"
+                  loading="lazy"
+                />
+                <div v-if="subQ.ms_details" class="ms-text-details">
+                  <pre>{{ subQ.ms_details }}</pre>
+                </div>
+              </div>
+            </transition>
+
+            <!-- Subquestion Notes / Comments Drawer -->
+            <transition name="slide-fade">
+              <div v-if="expandedComments[subQ.id]" class="subq-comment-box">
+                <div class="comment-drawer-header">
+                  <h5>📝 小问笔记与答疑讨论 ({{ subQ.question_raw_number }})</h5>
+                  <button @click="expandedComments[subQ.id] = false" class="close-drawer-btn">&times;</button>
+                </div>
+
+                <div class="comment-messages-list">
+                  <div v-if="!subQComments[subQ.id] || subQComments[subQ.id].length === 0" class="empty-comments">
+                    暂无讨论或个人笔记。写下你的做题思路或疑问吧！
+                  </div>
+                  <div v-for="c in subQComments[subQ.id]" :key="c.id" class="comment-item">
+                    <div class="comment-author">
+                      <span class="author-name">{{ c.profiles?.display_name || '学习者' }}</span>
+                      <span class="comment-time">{{ new Date(c.created_at).toLocaleString() }}</span>
+                    </div>
+                    <div class="comment-body">{{ c.message }}</div>
+                  </div>
+                </div>
+
+                <div class="comment-input-row">
+                  <input 
+                    v-model="newCommentText[subQ.id]" 
+                    type="text" 
+                    placeholder="写下本小问做题心得或讨论..." 
+                    @keyup.enter="addSubQComment(subQ)"
+                  />
+                  <button 
+                    @click="addSubQComment(subQ)" 
+                    :disabled="submittingComment[subQ.id]" 
+                    class="btn btn-primary btn-sm"
+                  >
+                    {{ submittingComment[subQ.id] ? '发送中...' : '提交笔记' }}
+                  </button>
+                </div>
+              </div>
+            </transition>
+          </div>
+        </div>
+
+        <!-- ================= MCQ: MULTIPLE CHOICE QUESTION DISPLAY ================= -->
+        <div v-else class="mcq-view">
+          <div class="mcq-tools-bar">
+            <button 
+              @click="toggleSubQAnswer(currentQuestionData.id)" 
+              class="btn"
+              :class="expandedAnswers[currentQuestionData.id] ? 'btn-warn' : 'btn-accent'"
+            >
+              {{ expandedAnswers[currentQuestionData.id] ? '💡 隐藏正确选项' : '💡 显示正确选项' }}
+            </button>
+            <button @click="openAskAI(currentQuestionData)" class="btn btn-ai">
+              🤖 AI 答疑解析
+            </button>
+          </div>
+
+          <div class="image-stage">
+            <img 
+              v-if="currentQuestionData.image_path"
+              :src="`${cdnBase}/${currentQuestionData.image_path}`" 
+              alt="Multiple Choice Question"
+              class="exam-image"
+            />
+          </div>
+
+          <!-- MCQ Answer Revelation -->
+          <div v-if="expandedAnswers[currentQuestionData.id]" class="mcq-answer-reveal">
+            <h3>Correct Option</h3>
+            <div class="answer-badge-large">{{ currentQuestionData.ms_details || 'Answer not recorded' }}</div>
           </div>
         </div>
       </div>
@@ -369,28 +777,108 @@ onMounted(async () => {
 <style scoped>
 .gallery-wrapper {
   margin-top: 10px;
+  position: relative;
 }
+
+/* Floating Toast */
+.toast-popup {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 14px 22px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.toast-fade-enter-active, .toast-fade-leave-active { transition: all 0.3s ease; }
+.toast-fade-enter-from, .toast-fade-leave-to { opacity: 0; transform: translateY(20px); }
 
 /* Control Panel */
 .control-panel {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.search-section {
+  width: 100%;
+}
+
+.search-input-wrapper {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  font-size: 1rem;
+  color: #94a3b8;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 100px 10px 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.search-input:focus {
+  border-color: #3e635f;
+  box-shadow: 0 0 0 3px rgba(62, 99, 95, 0.12);
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 90px;
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.btn-search {
+  position: absolute;
+  right: 6px;
+  background: #3e635f;
+  color: white;
+  padding: 6px 16px;
+  font-size: 0.85rem;
+}
+
+.filter-controls-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 16px;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 14px 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
 .filters {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 18px;
 }
 
 .filter-group {
@@ -438,12 +926,8 @@ onMounted(async () => {
   font-size: 0.85rem;
   color: #1e293b;
   background: white;
-  max-width: 240px;
+  max-width: 260px;
   outline: none;
-}
-
-.paper-select:focus {
-  border-color: #3e635f;
 }
 
 .nav-controls {
@@ -456,16 +940,86 @@ onMounted(async () => {
   font-size: 0.85rem;
   font-weight: 600;
   color: #64748b;
-  margin-right: 6px;
+  margin-right: 4px;
 }
 
-/* Viewport Card */
+/* Search Results Flyout Panel */
+.search-results-panel {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.search-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.search-results-header h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #1e293b;
+}
+
+.close-results-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.4rem;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.results-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.result-card {
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.result-card:hover {
+  background: #f1f5f9;
+  border-color: #3e635f;
+  transform: translateY(-2px);
+}
+
+.result-top {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.result-snippet {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.4;
+}
+
+/* Main Viewport Card */
 .viewport-card {
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   min-height: 480px;
 }
 
@@ -479,31 +1033,56 @@ onMounted(async () => {
   color: #64748b;
 }
 
-.question-meta-bar {
+/* Main Question Global Header */
+.main-q-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 14px 20px;
+  gap: 16px;
+  padding: 18px 24px;
   background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 2px solid #e2e8f0;
 }
 
-.meta-left {
+.header-tags {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
 }
 
-.meta-right {
+.main-q-title {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.subparts-count {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.header-actions {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
+.btn-stitch {
+  background: #0284c7;
+  color: white;
+  font-weight: 700;
+  box-shadow: 0 2px 4px rgba(2, 132, 199, 0.2);
+}
+.btn-stitch:hover:not(:disabled) {
+  background: #0369a1;
+}
+
+/* Tag Styles */
 .tag {
   display: inline-block;
   padding: 4px 10px;
@@ -511,126 +1090,251 @@ onMounted(async () => {
   font-size: 0.8rem;
   font-weight: 600;
 }
-
 .tag-series { background: #e0f2fe; color: #0369a1; }
 .tag-paper { background: #f1f5f9; color: #475569; }
 .tag-qnum { background: #fef3c7; color: #b45309; }
 .tag-score { background: #dcfce7; color: #15803d; }
+.tag-type-badge { background: #f3e8ff; color: #7e22ce; font-weight: 700; }
 
-.answer-banner {
-  background: #fffbeb;
-  border-bottom: 1px solid #fef3c7;
-  padding: 10px 20px;
+/* ================= SQ Stream Layout ================= */
+.sq-group-stream {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  gap: 28px;
+  background: #fdfdfd;
+}
+
+.subq-block {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.subq-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #b45309;
-  font-weight: 600;
-  font-size: 0.9rem;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 18px;
+  background: #f8fafc;
+  border-bottom: 1px solid #edf2f7;
 }
 
-.mcq-answer {
-  background: #f59e0b;
+.subq-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.subq-pill {
+  background: #1e293b;
   color: white;
-  padding: 2px 10px;
-  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 3px 12px;
+  border-radius: 14px;
+}
+
+.subq-score {
+  color: #15803d;
+  font-weight: 700;
   font-size: 0.85rem;
 }
 
-/* Image Stage */
-.image-stage {
-  padding: 24px;
-  background: #ffffff;
+.subq-tools {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  position: relative;
-  min-height: 300px;
+  gap: 8px;
+}
+
+.subq-image-box {
+  padding: 16px;
+  display: flex;
+  justify-content: center;
 }
 
 .exam-image {
-  max-width: 100%;
   width: 100%;
   max-width: 1240px;
   height: auto;
-  border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   object-fit: contain;
 }
 
-.image-loader {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+/* Subquestion Expanded Mark Scheme */
+.subq-ms-box {
+  margin: 0 16px 16px 16px;
+  padding: 16px;
+  background: #f0fdf4;
+  border: 1.5px dashed #86efac;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  color: #64748b;
+}
+
+.ms-label {
+  width: 100%;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #166534;
+  margin-bottom: 12px;
+}
+
+.exam-ms-image {
+  width: 100%;
+  max-width: 1240px;
+  height: auto;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.ms-text-details pre {
+  margin-top: 10px;
+  padding: 10px;
+  background: white;
+  border: 1px solid #dcfce7;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  color: #166534;
+}
+
+/* Subquestion Comments Box */
+.subq-comment-box {
+  margin: 0 16px 16px 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+}
+
+.comment-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.comment-drawer-header h5 {
+  margin: 0;
+  color: #334155;
   font-size: 0.9rem;
 }
 
-.text-answer-box {
-  background: #f8fafc;
-  border: 2px dashed #cbd5e1;
-  border-radius: 12px;
-  padding: 30px;
-  text-align: center;
-  margin: 40px auto;
-  max-width: 500px;
+.close-drawer-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  color: #94a3b8;
+  cursor: pointer;
 }
 
-.text-answer-box h3 {
-  margin: 0 0 16px 0;
-  color: #334155;
-  font-size: 1.1rem;
+.comment-messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 14px;
 }
 
-.answer-highlight {
-  font-size: 1.8rem;
-  font-weight: 800;
-  color: #3e635f;
-}
-
-/* OCR Drawer */
-.ocr-drawer {
-  background: #f8fafc;
-  border-top: 1px solid #e2e8f0;
-  padding: 20px 24px;
-}
-
-.drawer-header h4 {
-  margin: 0 0 14px 0;
-  color: #334155;
-  font-size: 0.95rem;
-}
-
-.drawer-body {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-.ocr-section h5 {
-  margin: 0 0 8px 0;
+.empty-comments {
   font-size: 0.85rem;
-  color: #64748b;
+  color: #94a3b8;
+  text-align: center;
+  padding: 14px 0;
 }
 
-.ocr-section pre {
+.comment-item {
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  padding: 12px;
-  font-size: 0.85rem;
-  white-space: pre-wrap;
-  color: #1e293b;
-  max-height: 250px;
-  overflow-y: auto;
+  border-radius: 8px;
+  padding: 8px 12px;
 }
 
-/* Buttons */
+.comment-author {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  margin-bottom: 4px;
+}
+
+.author-name {
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.comment-time {
+  color: #94a3b8;
+}
+
+.comment-body {
+  font-size: 0.88rem;
+  color: #334155;
+}
+
+.comment-input-row {
+  display: flex;
+  gap: 10px;
+}
+
+.comment-input-row input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.comment-input-row input:focus {
+  border-color: #3e635f;
+}
+
+/* ================= MCQ View ================= */
+.mcq-view {
+  padding: 24px;
+}
+
+.mcq-tools-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.image-stage {
+  display: flex;
+  justify-content: center;
+  background: white;
+}
+
+.mcq-answer-reveal {
+  margin: 30px auto;
+  padding: 24px;
+  max-width: 450px;
+  background: #fffbeb;
+  border: 2px dashed #f59e0b;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.mcq-answer-reveal h3 {
+  margin: 0 0 10px 0;
+  color: #b45309;
+}
+
+.answer-badge-large {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #b45309;
+}
+
+/* Common Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -642,6 +1346,12 @@ onMounted(async () => {
   cursor: pointer;
   border: none;
   transition: all 0.15s ease;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  border-radius: 6px;
 }
 
 .btn:disabled {
@@ -665,22 +1375,18 @@ onMounted(async () => {
 .btn-ai:hover { background: #6d28d9; }
 
 .btn-text { background: transparent; color: #64748b; border: 1px solid #cbd5e1; }
-.btn-text:hover { background: #f1f5f9; color: #0f172a; }
+.btn-text:hover, .btn-active { background: #f1f5f9; color: #0f172a; border-color: #94a3b8; }
 
-/* Spinners */
+/* Transitions */
+.slide-fade-enter-active { transition: all 0.25s ease-out; }
+.slide-fade-leave-active { transition: all 0.2s cubic-bezier(1, 0.5, 0.8, 1); }
+.slide-fade-enter-from, .slide-fade-leave-to { transform: translateY(-8px); opacity: 0; }
+
+/* Spinner */
 .spinner {
   width: 36px;
   height: 36px;
   border: 3px solid #e2e8f0;
-  border-top-color: #3e635f;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.spinner-sm {
-  width: 24px;
-  height: 24px;
-  border: 2px solid #e2e8f0;
   border-top-color: #3e635f;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -691,10 +1397,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .drawer-body {
-    grid-template-columns: 1fr;
-  }
-  .control-panel {
+  .filter-controls-row {
     flex-direction: column;
     align-items: stretch;
   }
