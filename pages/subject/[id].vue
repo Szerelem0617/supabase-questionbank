@@ -1,19 +1,18 @@
 <script setup>
 const route = useRoute()
-const subjectId = route.params.id
+const subjectId = ref(decodeURIComponent(route.params.id || ''))
 
-// SEO Meta
 useSeoMeta({
-  title: () => `Past Papers for Subject ${subjectId}`,
-  description: () => `Browse and practice real exam questions for ${subjectId}.`
+  title: () => `${subjectId.value} - Physics Questions & Mark Schemes`,
+  description: () => `Practice past paper physics questions and mark schemes for ${subjectId.value}.`
 })
 </script>
 
 <template>
-  <div class="container">
+  <div class="subject-container">
     <div class="header">
-      <h1>Subject: {{ subjectId }}</h1>
-      <NuxtLink to="/" class="back-link">&larr; Back to Subjects</NuxtLink>
+      <NuxtLink to="/" class="back-link">&larr; All Exam Series</NuxtLink>
+      <h1 class="title">{{ subjectId }}</h1>
     </div>
     
     <QuestionGallery :subjectId="subjectId" />
@@ -21,19 +20,37 @@ useSeoMeta({
 </template>
 
 <style scoped>
+.subject-container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eee;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
 }
+
 .back-link {
-  color: #666;
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #3e635f;
   text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: color 0.15s;
 }
+
 .back-link:hover {
+  color: #243d3a;
   text-decoration: underline;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #0f172a;
+  font-weight: 800;
 }
 </style>
