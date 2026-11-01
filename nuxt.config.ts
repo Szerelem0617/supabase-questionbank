@@ -3,6 +3,13 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-04-03',
   devtools: { enabled: true },
 
+  runtimeConfig: {
+    public: {
+      cdnBaseUrl: process.env.NUXT_PUBLIC_CDN_BASE_URL || 'https://assets.66367749.xyz',
+      r2DevUrl: process.env.NUXT_PUBLIC_R2_DEV_URL || 'https://pub-b20547c0488b456f8b6c033d9a7a1ca1.r2.dev'
+    }
+  },
+
   // 1. 启用模块
   modules: ['@nuxtjs/supabase'],
 
