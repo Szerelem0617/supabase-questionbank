@@ -22,6 +22,7 @@ const isSqGroup = computed(() => groupQuestions.value.length > 0 && currentQuest
 // Subquestion individual states
 const expandedAnswers = ref({}) // { [subQId]: boolean }
 const expandedComments = ref({}) // { [subQId]: boolean }
+const isShortSubQ = ref({}) // { [subQId]: boolean }
 const subQComments = ref({}) // { [subQId]: [] }
 const newCommentText = ref({}) // { [subQId]: string }
 const submittingComment = ref({}) // { [subQId]: boolean }
@@ -40,11 +41,6 @@ const isSearching = ref(false)
 const searchResults = ref([])
 const showSearchResults = ref(false)
 
-// AI Modal State
-const showAskModal = ref(false)
-const modalQNum = ref('')
-const modalContext = ref('')
-
 // Toast Notification
 const toastMessage = ref('')
 const showToastNotification = ref(false)
@@ -56,13 +52,13 @@ function showToast(msg) {
   if (toastTimer) clearTimeout(toastTimer)
   toastTimer = setTimeout(() => {
     showToastNotification.value = false
-  }, 3000)
+  }, 2800)
 }
 
 // Copy Image State
 const copyingImage = ref(false)
 
-// --- Helper Functions ---
+// Helper: Extract main question number
 function getMainQuestionNumber(raw) {
   if (!raw) return ''
   const str = String(raw).trim()
@@ -139,6 +135,7 @@ async function loadQuestionById(id) {
   loading.value = true
   expandedAnswers.value = {}
   expandedComments.value = {}
+  isShortSubQ.value = {}
 
   try {
     const { data: primaryQ, error } = await client
@@ -164,7 +161,6 @@ async function loadQuestionById(id) {
         .order('start_y', { ascending: true })
 
       if (!sibError && siblings && siblings.length > 0) {
-        // Filter siblings that share the same main question number
         const matchedSiblings = siblings.filter(s => {
           return getMainQuestionNumber(s.question_raw_number) === mainNum
         })
@@ -173,7 +169,6 @@ async function loadQuestionById(id) {
         groupQuestions.value = [primaryQ]
       }
     } else {
-      // MCQ or standalone
       groupQuestions.value = [primaryQ]
     }
   } catch (err) {
@@ -184,7 +179,14 @@ async function loadQuestionById(id) {
   }
 }
 
-// 4. Navigation
+// 4. Subquestion Image Height Check for Adaptive Right Dock
+function onSubQImageLoad(event, subQId) {
+  const h = event.target.naturalHeight || event.target.clientHeight || 0
+  // If subquestion height is short (< 140px), arrange side buttons horizontally to prevent overflow
+  isShortSubQ.value[subQId] = h < 140
+}
+
+// 5. Navigation
 function nextQuestion() {
   if (questionList.value.length === 0) return
   if (currentIndex.value < questionList.value.length - 1) {
@@ -212,7 +214,7 @@ function randomQuestion() {
   loadQuestionById(questionList.value[randIdx].id)
 }
 
-// 5. Subquestion Mark Scheme Controls
+// 6. Subquestion Mark Scheme Controls
 function toggleSubQAnswer(subQId) {
   expandedAnswers.value[subQId] = !expandedAnswers.value[subQId]
 }
@@ -227,7 +229,7 @@ function collapseAllAnswers() {
   expandedAnswers.value = {}
 }
 
-// 6. Search Functionality
+// 7. Search Functionality
 async function handleSearch() {
   const kw = searchKeyword.value.trim()
   if (!kw) {
@@ -260,7 +262,47 @@ function selectSearchResult(item) {
   loadQuestionById(item.id)
 }
 
-// 7. Stitched Image Copy (Adapted from siyuan-plugin-edu copySqGroup)
+// 8. Copy Single Subquestion Image directly to Clipboard
+async function copySingleSubQImage(subQ) {
+  if (!subQ.image_path) {
+    showToast('⚠️ No image available for this sub-question.')
+    return
+  }
+
+  showToast(`⏳ 正在复制小问 ${subQ.question_raw_number}...`)
+  try {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    await new Promise((resolve, reject) => {
+      img.onload = resolve
+      img.onerror = () => reject(new Error('Image load failed'))
+      img.src = `${cdnBase.value}/${subQ.image_path}`
+    })
+
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth || img.width
+    canvas.height = img.naturalHeight || img.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas context unavailable')
+
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(img, 0, 0)
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) throw new Error('Blob creation failed')
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ])
+      showToast(`✅ 小问 ${subQ.question_raw_number} 切图已复制到剪贴板！`)
+    }, 'image/png')
+  } catch (err) {
+    console.error('Failed to copy subq image:', err)
+    showToast(`❌ 复制小题失败: ${err.message}`)
+  }
+}
+
+// 9. Stitched Full Main Question Image Copy (Adaptive Canvas)
 async function copyStitchedQuestion() {
   const validQuestions = groupQuestions.value.filter(q => q.image_path)
   if (validQuestions.length === 0) {
@@ -269,10 +311,9 @@ async function copyStitchedQuestion() {
   }
 
   copyingImage.value = true
-  showToast('⏳ Stitching question images...')
+  showToast('⏳ 正在拼接整题高清图片...')
 
   try {
-    // Load all images via CORS-enabled Image objects
     const loadedImgs = await Promise.all(
       validQuestions.map(q => {
         return new Promise((resolve, reject) => {
@@ -292,7 +333,6 @@ async function copyStitchedQuestion() {
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('Could not create canvas context')
 
-    // Single column if totalHeight <= 1800px or only 1 image
     if (totalHeight <= 1800 || loadedImgs.length === 1) {
       canvas.width = maxWidth
       canvas.height = totalHeight
@@ -306,7 +346,6 @@ async function copyStitchedQuestion() {
         currentY += img.height
       }
     } else {
-      // Two balanced columns (Left / Right)
       const heights = loadedImgs.map(img => img.height)
       const n = loadedImgs.length
 
@@ -350,7 +389,6 @@ async function copyStitchedQuestion() {
       }
     }
 
-    // Write to clipboard as PNG
     canvas.toBlob(async (blob) => {
       if (!blob) throw new Error('Canvas conversion to blob failed')
       await navigator.clipboard.write([
@@ -360,13 +398,13 @@ async function copyStitchedQuestion() {
     }, 'image/png')
   } catch (err) {
     console.error('Failed to copy stitched image:', err)
-    showToast('❌ 复制切图失败: ' + err.message)
+    showToast('❌ 复制整题失败: ' + err.message)
   } finally {
     copyingImage.value = false
   }
 }
 
-// 8. Subquestion Comments
+// 10. Subquestion Comments
 async function toggleSubQComment(subQId) {
   expandedComments.value[subQId] = !expandedComments.value[subQId]
   if (expandedComments.value[subQId] && !subQComments.value[subQId]) {
@@ -425,13 +463,6 @@ async function addSubQComment(subQ) {
   }
 }
 
-// 9. AI Tutor Modal Trigger
-function openAskAI(subQ) {
-  modalQNum.value = subQ?.question_raw_number || currentQuestionData.value?.question_raw_number || ''
-  modalContext.value = subQ?.details || currentQuestionData.value?.details || ''
-  showAskModal.value = true
-}
-
 // Watch filters
 watch(paperTypeFilter, () => {
   loadQuestionPool()
@@ -464,13 +495,6 @@ onMounted(async () => {
         {{ toastMessage }}
       </div>
     </transition>
-
-    <AskAIModal 
-      :isOpen="showAskModal"
-      :questionNumber="modalQNum"
-      :contextText="modalContext"
-      @close="showAskModal = false"
-    />
 
     <!-- Top Search & Filter Bar -->
     <div class="control-panel">
@@ -566,7 +590,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Main Question Viewport Card -->
+    <!-- Main Viewport Card -->
     <div class="viewport-card">
       <div v-if="loading" class="state-container">
         <div class="spinner"></div>
@@ -581,7 +605,7 @@ onMounted(async () => {
       </div>
 
       <div v-else class="question-container">
-        <!-- Main Question Global Header -->
+        <!-- Main Question Header -->
         <div class="main-q-header">
           <div class="header-info">
             <div class="header-tags">
@@ -600,9 +624,8 @@ onMounted(async () => {
             </h2>
           </div>
 
-          <!-- Global Action Buttons -->
+          <!-- Header Action Buttons -->
           <div class="header-actions">
-            <!-- Copy Stitched Question Button -->
             <button 
               @click="copyStitchedQuestion" 
               :disabled="copyingImage" 
@@ -612,7 +635,6 @@ onMounted(async () => {
               📋 {{ copyingImage ? 'Stitching...' : '复制整题切图' }}
             </button>
 
-            <!-- SQ Batch Toggle Answers -->
             <template v-if="currentQuestionData.paper_type === 'SQ'">
               <button @click="expandAllAnswers" class="btn btn-secondary">
                 💡 展开全部答案
@@ -624,103 +646,121 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- ================= SQ: MULTI-PART FULL QUESTION DISPLAY ================= -->
-        <div v-if="currentQuestionData.paper_type === 'SQ'" class="sq-group-stream">
+        <!-- ================= SQ: CONTINUOUS SEAMLESS PAPER VIEW WITH RIGHT DOCK ================= -->
+        <div v-if="currentQuestionData.paper_type === 'SQ'" class="seamless-paper-sheet">
           <div 
             v-for="(subQ, idx) in groupQuestions" 
             :key="subQ.id" 
-            class="subq-block"
+            class="subq-row-container"
           >
-            <!-- Subquestion Top Action Bar -->
-            <div class="subq-bar">
-              <div class="subq-meta">
-                <span class="subq-pill">{{ subQ.question_raw_number }}</span>
-                <span class="subq-score" v-if="subQ.score">[{{ subQ.score }} {{ subQ.score > 1 ? 'marks' : 'mark' }}]</span>
+            <!-- Subquestion Row (Left Image, Right Action Dock) -->
+            <div class="subq-main-row">
+              <!-- Left: Subquestion Question Image (Touches seamlessly with adjacent slices) -->
+              <div class="subq-img-wrap">
+                <img 
+                  v-if="subQ.image_path"
+                  :src="`${cdnBase}/${subQ.image_path}`" 
+                  :alt="`Sub-question ${subQ.question_raw_number}`"
+                  class="exam-subq-image"
+                  loading="lazy"
+                  @load="(e) => onSubQImageLoad(e, subQ.id)"
+                />
               </div>
 
-              <div class="subq-tools">
-                <!-- Toggle Individual Mark Scheme -->
+              <!-- Right: Subquestion Dedicated Action Dock -->
+              <div 
+                class="subq-action-dock" 
+                :class="{ 'dock-horizontal': isShortSubQ[subQ.id] }"
+              >
+                <!-- Question Number & Marks Pill -->
+                <div class="dock-badge">
+                  <span class="dock-qnum">{{ subQ.question_raw_number }}</span>
+                  <span v-if="subQ.score" class="dock-marks">[{{ subQ.score }}m]</span>
+                </div>
+
+                <!-- 1. Toggle Mark Scheme -->
                 <button 
                   v-if="subQ.ms_image_path || subQ.ms_details"
                   @click="toggleSubQAnswer(subQ.id)" 
-                  class="btn btn-sm"
-                  :class="expandedAnswers[subQ.id] ? 'btn-warn' : 'btn-accent'"
+                  class="dock-btn"
+                  :class="{ 'dock-btn-active': expandedAnswers[subQ.id] }"
+                  title="查看/收起此问答案"
                 >
-                  {{ expandedAnswers[subQ.id] ? '💡 收起答案' : '💡 查看答案' }}
+                  <span class="dock-icon">💡</span>
+                  <span class="dock-label">{{ expandedAnswers[subQ.id] ? '收起答案' : '查看答案' }}</span>
                 </button>
 
-                <!-- Subquestion Notes / Comments -->
+                <!-- 2. Copy this Subquestion Image directly -->
+                <button 
+                  @click="copySingleSubQImage(subQ)" 
+                  class="dock-btn"
+                  title="复制本小问切图到剪贴板"
+                >
+                  <span class="dock-icon">📋</span>
+                  <span class="dock-label">复制此问</span>
+                </button>
+
+                <!-- 3. Subquestion Notes / Comments -->
                 <button 
                   @click="toggleSubQComment(subQ.id)" 
-                  class="btn btn-sm btn-text"
-                  :class="{ 'btn-active': expandedComments[subQ.id] }"
+                  class="dock-btn"
+                  :class="{ 'dock-btn-active': expandedComments[subQ.id] }"
+                  title="小问笔记与做题讨论"
                 >
-                  💬 笔记/讨论 {{ subQComments[subQ.id]?.length ? `(${subQComments[subQ.id].length})` : '' }}
-                </button>
-
-                <!-- Ask AI Tutor -->
-                <button @click="openAskAI(subQ)" class="btn btn-sm btn-ai">
-                  🤖 AI 答疑
+                  <span class="dock-icon">💬</span>
+                  <span class="dock-label">笔记{{ subQComments[subQ.id]?.length ? `(${subQComments[subQ.id].length})` : '' }}</span>
                 </button>
               </div>
             </div>
 
-            <!-- Subquestion Question Slice Image -->
-            <div class="subq-image-box">
-              <img 
-                v-if="subQ.image_path"
-                :src="`${cdnBase}/${subQ.image_path}`" 
-                :alt="`Sub-question ${subQ.question_raw_number}`"
-                class="exam-image"
-                loading="lazy"
-              />
-            </div>
-
-            <!-- Subquestion Expanded Mark Scheme -->
-            <transition name="slide-fade">
-              <div v-if="expandedAnswers[subQ.id]" class="subq-ms-box">
-                <div class="ms-label">
-                  <span>✨ 官方评分标准 (Mark Scheme - {{ subQ.question_raw_number }})</span>
+            <!-- Subquestion Expanded Mark Scheme Drawer -->
+            <transition name="slide-down">
+              <div v-if="expandedAnswers[subQ.id]" class="subq-ms-drawer">
+                <div class="ms-drawer-tag">
+                  <span>✨ {{ subQ.question_raw_number }} 评分标准 (Mark Scheme)</span>
+                  <button @click="expandedAnswers[subQ.id] = false" class="close-drawer-mini">&times;</button>
                 </div>
-                <img 
-                  v-if="subQ.ms_image_path"
-                  :src="`${cdnBase}/${subQ.ms_image_path}`" 
-                  alt="Mark Scheme"
-                  class="exam-ms-image"
-                  loading="lazy"
-                />
-                <div v-if="subQ.ms_details" class="ms-text-details">
-                  <pre>{{ subQ.ms_details }}</pre>
+                <div class="ms-drawer-body">
+                  <img 
+                    v-if="subQ.ms_image_path"
+                    :src="`${cdnBase}/${subQ.ms_image_path}`" 
+                    alt="Mark Scheme"
+                    class="exam-ms-image"
+                    loading="lazy"
+                  />
+                  <div v-if="subQ.ms_details" class="ms-text-details">
+                    <pre>{{ subQ.ms_details }}</pre>
+                  </div>
                 </div>
               </div>
             </transition>
 
-            <!-- Subquestion Notes / Comments Drawer -->
-            <transition name="slide-fade">
-              <div v-if="expandedComments[subQ.id]" class="subq-comment-box">
-                <div class="comment-drawer-header">
-                  <h5>📝 小问笔记与答疑讨论 ({{ subQ.question_raw_number }})</h5>
-                  <button @click="expandedComments[subQ.id] = false" class="close-drawer-btn">&times;</button>
+            <!-- Subquestion Discussion / Notes Drawer -->
+            <transition name="slide-down">
+              <div v-if="expandedComments[subQ.id]" class="subq-notes-drawer">
+                <div class="notes-drawer-header">
+                  <h5>📝 小问笔记与讨论 ({{ subQ.question_raw_number }})</h5>
+                  <button @click="expandedComments[subQ.id] = false" class="close-drawer-mini">&times;</button>
                 </div>
 
-                <div class="comment-messages-list">
-                  <div v-if="!subQComments[subQ.id] || subQComments[subQ.id].length === 0" class="empty-comments">
-                    暂无讨论或个人笔记。写下你的做题思路或疑问吧！
+                <div class="notes-messages-list">
+                  <div v-if="!subQComments[subQ.id] || subQComments[subQ.id].length === 0" class="empty-notes">
+                    暂无本小题的专属笔记。记录下解题关键点或困惑吧！
                   </div>
-                  <div v-for="c in subQComments[subQ.id]" :key="c.id" class="comment-item">
-                    <div class="comment-author">
-                      <span class="author-name">{{ c.profiles?.display_name || '学习者' }}</span>
-                      <span class="comment-time">{{ new Date(c.created_at).toLocaleString() }}</span>
+                  <div v-for="c in subQComments[subQ.id]" :key="c.id" class="notes-item">
+                    <div class="notes-author">
+                      <span class="author-name">{{ c.profiles?.display_name || '同学' }}</span>
+                      <span class="notes-time">{{ new Date(c.created_at).toLocaleString() }}</span>
                     </div>
-                    <div class="comment-body">{{ c.message }}</div>
+                    <div class="notes-body">{{ c.message }}</div>
                   </div>
                 </div>
 
-                <div class="comment-input-row">
+                <div class="notes-input-row">
                   <input 
                     v-model="newCommentText[subQ.id]" 
                     type="text" 
-                    placeholder="写下本小问做题心得或讨论..." 
+                    placeholder="输入本问做题笔记或疑问..." 
                     @keyup.enter="addSubQComment(subQ)"
                   />
                   <button 
@@ -728,7 +768,7 @@ onMounted(async () => {
                     :disabled="submittingComment[subQ.id]" 
                     class="btn btn-primary btn-sm"
                   >
-                    {{ submittingComment[subQ.id] ? '发送中...' : '提交笔记' }}
+                    {{ submittingComment[subQ.id] ? '保存中...' : '保存笔记' }}
                   </button>
                 </div>
               </div>
@@ -738,26 +778,40 @@ onMounted(async () => {
 
         <!-- ================= MCQ: MULTIPLE CHOICE QUESTION DISPLAY ================= -->
         <div v-else class="mcq-view">
-          <div class="mcq-tools-bar">
-            <button 
-              @click="toggleSubQAnswer(currentQuestionData.id)" 
-              class="btn"
-              :class="expandedAnswers[currentQuestionData.id] ? 'btn-warn' : 'btn-accent'"
-            >
-              {{ expandedAnswers[currentQuestionData.id] ? '💡 隐藏正确选项' : '💡 显示正确选项' }}
-            </button>
-            <button @click="openAskAI(currentQuestionData)" class="btn btn-ai">
-              🤖 AI 答疑解析
-            </button>
-          </div>
+          <div class="mcq-main-row">
+            <div class="mcq-img-wrap">
+              <img 
+                v-if="currentQuestionData.image_path"
+                :src="`${cdnBase}/${currentQuestionData.image_path}`" 
+                alt="Multiple Choice Question"
+                class="exam-subq-image"
+              />
+            </div>
 
-          <div class="image-stage">
-            <img 
-              v-if="currentQuestionData.image_path"
-              :src="`${cdnBase}/${currentQuestionData.image_path}`" 
-              alt="Multiple Choice Question"
-              class="exam-image"
-            />
+            <!-- MCQ Right Dock -->
+            <div class="subq-action-dock">
+              <div class="dock-badge">
+                <span class="dock-qnum">{{ currentQuestionData.question_raw_number }}</span>
+                <span class="dock-marks">[1m]</span>
+              </div>
+
+              <button 
+                @click="toggleSubQAnswer(currentQuestionData.id)" 
+                class="dock-btn"
+                :class="{ 'dock-btn-active': expandedAnswers[currentQuestionData.id] }"
+              >
+                <span class="dock-icon">💡</span>
+                <span class="dock-label">{{ expandedAnswers[currentQuestionData.id] ? '隐藏答案' : '显示答案' }}</span>
+              </button>
+
+              <button 
+                @click="copySingleSubQImage(currentQuestionData)" 
+                class="dock-btn"
+              >
+                <span class="dock-icon">📋</span>
+                <span class="dock-label">复制此题</span>
+              </button>
+            </div>
           </div>
 
           <!-- MCQ Answer Revelation -->
@@ -943,7 +997,7 @@ onMounted(async () => {
   margin-right: 4px;
 }
 
-/* Search Results Flyout Panel */
+/* Search Results Panel */
 .search-results-panel {
   background: white;
   border: 1px solid #e2e8f0;
@@ -1013,7 +1067,7 @@ onMounted(async () => {
   line-height: 1.4;
 }
 
-/* Main Viewport Card */
+/* Viewport Card */
 .viewport-card {
   background: white;
   border: 1px solid #e2e8f0;
@@ -1033,7 +1087,7 @@ onMounted(async () => {
   color: #64748b;
 }
 
-/* Main Question Global Header */
+/* Main Question Header */
 .main-q-header {
   display: flex;
   justify-content: space-between;
@@ -1096,92 +1150,144 @@ onMounted(async () => {
 .tag-score { background: #dcfce7; color: #15803d; }
 .tag-type-badge { background: #f3e8ff; color: #7e22ce; font-weight: 700; }
 
-/* ================= SQ Stream Layout ================= */
-.sq-group-stream {
+/* ================= SQ Continuous Paper Sheet ================= */
+.seamless-paper-sheet {
   display: flex;
   flex-direction: column;
-  padding: 24px;
-  gap: 28px;
-  background: #fdfdfd;
+  background: #ffffff;
+  padding: 20px 24px;
+  gap: 0; /* Consecutive slices touch seamlessly */
 }
 
-.subq-block {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.subq-bar {
+.subq-row-container {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px 18px;
-  background: #f8fafc;
-  border-bottom: 1px solid #edf2f7;
+  flex-direction: column;
+  border-bottom: 1px dashed #e2e8f0;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+.subq-row-container:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
 }
 
-.subq-meta {
+.subq-main-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 16px;
+  position: relative;
 }
 
-.subq-pill {
-  background: #1e293b;
-  color: white;
-  font-weight: 700;
-  font-size: 0.9rem;
-  padding: 3px 12px;
-  border-radius: 14px;
-}
-
-.subq-score {
-  color: #15803d;
-  font-weight: 700;
-  font-size: 0.85rem;
-}
-
-.subq-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.subq-image-box {
-  padding: 16px;
-  display: flex;
-  justify-content: center;
-}
-
-.exam-image {
-  width: 100%;
+/* Left Image Wrap */
+.subq-img-wrap {
+  flex: 1;
   max-width: 1240px;
+  line-height: 0;
+}
+
+.exam-subq-image {
+  width: 100%;
   height: auto;
+  display: block;
   object-fit: contain;
 }
 
-/* Subquestion Expanded Mark Scheme */
-.subq-ms-box {
-  margin: 0 16px 16px 16px;
+/* Right Side Action Dock */
+.subq-action-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 110px;
+  padding: 4px 0;
+  flex-shrink: 0;
+}
+
+/* When subquestion is particularly short, layout buttons horizontally to avoid overflow */
+.subq-action-dock.dock-horizontal {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dock-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1e293b;
+  width: fit-content;
+}
+
+.dock-marks {
+  color: #15803d;
+  font-size: 0.75rem;
+}
+
+.dock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: white;
+  color: #334155;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.dock-btn:hover {
+  background: #f8fafc;
+  border-color: #3e635f;
+  color: #3e635f;
+}
+
+.dock-btn-active {
+  background: #e0f2fe !important;
+  border-color: #0284c7 !important;
+  color: #0369a1 !important;
+}
+
+.dock-icon {
+  font-size: 0.9rem;
+}
+
+/* Subquestion Mark Scheme Drawer */
+.subq-ms-drawer {
+  margin-top: 12px;
   padding: 16px;
   background: #f0fdf4;
   border: 1.5px dashed #86efac;
   border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  position: relative;
 }
 
-.ms-label {
-  width: 100%;
+.ms-drawer-tag {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 0.85rem;
   font-weight: 700;
   color: #166534;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+}
+
+.close-drawer-mini {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  color: #166534;
+  cursor: pointer;
 }
 
 .exam-ms-image {
@@ -1189,7 +1295,7 @@ onMounted(async () => {
   max-width: 1240px;
   height: auto;
   border-radius: 6px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .ms-text-details pre {
@@ -1203,64 +1309,56 @@ onMounted(async () => {
   color: #166534;
 }
 
-/* Subquestion Comments Box */
-.subq-comment-box {
-  margin: 0 16px 16px 16px;
+/* Subquestion Notes Drawer */
+.subq-notes-drawer {
+  margin-top: 12px;
   padding: 16px;
   background: #f8fafc;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
 }
 
-.comment-drawer-header {
+.notes-drawer-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
 }
 
-.comment-drawer-header h5 {
+.notes-drawer-header h5 {
   margin: 0;
   color: #334155;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
-.close-drawer-btn {
-  background: transparent;
-  border: none;
-  font-size: 1.2rem;
-  color: #94a3b8;
-  cursor: pointer;
-}
-
-.comment-messages-list {
+.notes-messages-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: 200px;
+  gap: 8px;
+  max-height: 180px;
   overflow-y: auto;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
-.empty-comments {
-  font-size: 0.85rem;
+.empty-notes {
+  font-size: 0.82rem;
   color: #94a3b8;
   text-align: center;
-  padding: 14px 0;
+  padding: 10px 0;
 }
 
-.comment-item {
+.notes-item {
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 8px 12px;
+  border-radius: 6px;
+  padding: 8px 10px;
 }
 
-.comment-author {
+.notes-author {
   display: flex;
   justify-content: space-between;
-  font-size: 0.78rem;
-  margin-bottom: 4px;
+  font-size: 0.75rem;
+  margin-bottom: 3px;
 }
 
 .author-name {
@@ -1268,30 +1366,30 @@ onMounted(async () => {
   color: #1e293b;
 }
 
-.comment-time {
+.notes-time {
   color: #94a3b8;
 }
 
-.comment-body {
-  font-size: 0.88rem;
+.notes-body {
+  font-size: 0.85rem;
   color: #334155;
 }
 
-.comment-input-row {
+.notes-input-row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
-.comment-input-row input {
+.notes-input-row input {
   flex: 1;
-  padding: 8px 12px;
+  padding: 7px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   font-size: 0.85rem;
   outline: none;
 }
 
-.comment-input-row input:focus {
+.notes-input-row input:focus {
   border-color: #3e635f;
 }
 
@@ -1300,17 +1398,15 @@ onMounted(async () => {
   padding: 24px;
 }
 
-.mcq-tools-bar {
+.mcq-main-row {
   display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-bottom: 20px;
+  align-items: flex-start;
+  gap: 20px;
 }
 
-.image-stage {
-  display: flex;
-  justify-content: center;
-  background: white;
+.mcq-img-wrap {
+  flex: 1;
+  max-width: 1240px;
 }
 
 .mcq-answer-reveal {
@@ -1349,7 +1445,7 @@ onMounted(async () => {
 }
 
 .btn-sm {
-  padding: 4px 10px;
+  padding: 5px 10px;
   font-size: 0.8rem;
   border-radius: 6px;
 }
@@ -1365,22 +1461,10 @@ onMounted(async () => {
 .btn-secondary { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
 .btn-secondary:hover:not(:disabled) { background: #e2e8f0; }
 
-.btn-accent { background: #0284c7; color: white; }
-.btn-accent:hover { background: #0369a1; }
-
-.btn-warn { background: #d97706; color: white; }
-.btn-warn:hover { background: #b45309; }
-
-.btn-ai { background: #7c3aed; color: white; }
-.btn-ai:hover { background: #6d28d9; }
-
-.btn-text { background: transparent; color: #64748b; border: 1px solid #cbd5e1; }
-.btn-text:hover, .btn-active { background: #f1f5f9; color: #0f172a; border-color: #94a3b8; }
-
 /* Transitions */
-.slide-fade-enter-active { transition: all 0.25s ease-out; }
-.slide-fade-leave-active { transition: all 0.2s cubic-bezier(1, 0.5, 0.8, 1); }
-.slide-fade-enter-from, .slide-fade-leave-to { transform: translateY(-8px); opacity: 0; }
+.slide-down-enter-active { transition: all 0.25s ease-out; }
+.slide-down-leave-active { transition: all 0.2s cubic-bezier(1, 0.5, 0.8, 1); }
+.slide-down-enter-from, .slide-down-leave-to { transform: translateY(-8px); opacity: 0; }
 
 /* Spinner */
 .spinner {
@@ -1397,6 +1481,14 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
+  .subq-main-row, .mcq-main-row {
+    flex-direction: column;
+  }
+  .subq-action-dock {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+  }
   .filter-controls-row {
     flex-direction: column;
     align-items: stretch;
