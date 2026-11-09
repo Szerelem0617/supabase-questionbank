@@ -93,6 +93,12 @@ const currentStreamQuestions = computed(() => {
   return poolStore.groupedQuestions.value
 })
 
+const isStreamLoading = computed(() => {
+  if (favoritesStore.isFavoriteMode.value) return false
+  if (searchStore.isSearchMode.value) return searchStore.isSearching.value
+  return poolStore.isPoolLoading.value || (!poolStore.isPoolReady.value && poolStore.groupedQuestions.value.length === 0)
+})
+
 function initSeedQuestion() {
   const seed = getSubjectSeedQuestion(props.subjectId)
   if (seed) {
@@ -721,6 +727,7 @@ onUnmounted(() => {
         :searchTotalCount="searchStore.searchTotalCount.value"
         :searchTotalSubCount="searchStore.searchTotalSubCount.value"
         :isSearching="searchStore.isSearching.value"
+        :isLoading="isStreamLoading"
         :activeFolder="favoritesStore.activeFolder.value"
         :favFilterSubject="favFilterSubject"
         :favAvailableSubjects="favAvailableSubjects"

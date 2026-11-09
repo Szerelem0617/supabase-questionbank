@@ -21,6 +21,7 @@ const props = defineProps({
   searchTotalCount: { type: Number, default: 0 },
   searchTotalSubCount: { type: Number, default: 0 },
   isSearching: { type: Boolean, default: false },
+  isLoading: { type: Boolean, default: false },
   // Favorites mode props
   subjectId: { type: String, default: '' },
   favFilterSubject: { type: String, default: 'ALL' },
@@ -309,8 +310,27 @@ defineExpose({
 
     <!-- 2. Continuous Question Cards Stream -->
     <div class="stream-cards-container">
-      <!-- Empty State -->
-      <div v-if="streamItems.length === 0" class="stream-empty-state">
+      <!-- Loading State -->
+      <div v-if="isLoading" class="stream-loading-state">
+        <div class="loading-spinner-wrap">
+          <span class="loading-atom-icon">⚛</span>
+          <p class="loading-label">{{ locale === 'zh' ? '正在载入真题试卷与题库...' : 'Loading past papers & questions...' }}</p>
+          <span class="loading-sub-hint">{{ locale === 'zh' ? '连接云端数据中，稍候即现' : 'Connecting to repository, questions will appear shortly...' }}</span>
+        </div>
+        <!-- Elegant Skeleton Cards -->
+        <div class="stream-skeleton-cards">
+          <div class="skeleton-card" v-for="i in 2" :key="i">
+            <div class="skeleton-header">
+              <div class="skeleton-pill"></div>
+              <div class="skeleton-pill" style="width: 140px;"></div>
+            </div>
+            <div class="skeleton-body"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State (Only when NOT loading and length === 0) -->
+      <div v-else-if="streamItems.length === 0" class="stream-empty-state">
         <p v-if="mode === 'search'">{{ t('search.noResults') }}</p>
         <template v-else-if="mode === 'favorites'">
           <p v-if="favFilterSubject !== 'ALL' && currentFolderTotalCount > 0">
@@ -698,6 +718,95 @@ defineExpose({
   border-color: var(--accent-primary);
   color: var(--accent-primary);
   background: var(--accent-primary-light);
+}
+
+/* Loading State & Paper Skeletons */
+.stream-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 36px 16px;
+  width: 100%;
+}
+
+.loading-spinner-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.loading-atom-icon {
+  font-size: 2.2rem;
+  color: var(--accent-primary);
+  display: inline-block;
+  animation: atomSpin 2s linear infinite;
+}
+
+@keyframes atomSpin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.15); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+.loading-label {
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.loading-sub-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.stream-skeleton-cards {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.skeleton-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(44, 47, 50, 0.03);
+}
+
+.skeleton-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.skeleton-pill {
+  height: 22px;
+  width: 80px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(0,0,0,0.04) 25%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.04) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.8s infinite;
+}
+
+.skeleton-body {
+  height: 180px;
+  width: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(0,0,0,0.03) 25%, rgba(0,0,0,0.06) 50%, rgba(0,0,0,0.03) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.8s infinite;
+}
+
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* 2. Stream Question Cards */
