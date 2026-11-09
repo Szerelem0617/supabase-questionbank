@@ -1,7 +1,8 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router' // Nuxt 3 推荐使用 useRouter
-const client = useSupabaseClient() // 使用 Nuxt 提供的 Supabase 客户端
+import { useRouter } from 'vue-router'
+const { t, locale } = useI18n()
+const client = useSupabaseClient()
 
 const loading = ref(false)
 const email = ref('')
@@ -16,8 +17,7 @@ const handleLogin = async () => {
       password: password.value,
     })
     if (error) throw error
-    alert('Check your email for the login link!')
-    router.push('/') // 登录成功后跳转到首页
+    router.push('/')
   } catch (error) {
     if (error instanceof Error) {
       alert(error.message)
@@ -35,8 +35,8 @@ const handleRegister = async () => {
       password: password.value,
     })
     if (error) throw error
-    alert('Registration successful! Check your email to confirm.')
-    router.push('/') // 注册成功后跳转到首页
+    alert(locale.value === 'zh' ? '注册成功！请查收验证邮件以完成确认。' : 'Registration successful! Check your email to confirm.')
+    router.push('/')
   } catch (error) {
     if (error instanceof Error) {
       alert(error.message)
@@ -52,7 +52,7 @@ const signInWithOAuth = async (provider) => {
     const { error } = await client.auth.signInWithOAuth({
       provider: provider,
       options: {
-        redirectTo: `${window.location.origin}/`, // 统一重定向到根路径
+        redirectTo: `${window.location.origin}/`,
       },
     })
     if (error) throw error
@@ -69,114 +69,148 @@ const signInWithOAuth = async (provider) => {
 <template>
   <div class="auth-container">
     <div class="auth-card">
-      <h1 class="header">Supabase + Nuxt 3</h1>
-      <p class="description">Sign in or register below</p>
+      <h1 class="header">{{ t('auth.signInTitle') }}</h1>
+      <p class="description">{{ locale === 'zh' ? '请登录以同步收藏夹与做题讨论' : 'Sign in to sync favorites & discussion' }}</p>
       <div>
-        <input class="inputField" type="email" placeholder="Your email" v-model="email" />
+        <input class="inputField" type="email" :placeholder="t('auth.emailPlaceholder')" v-model="email" />
       </div>
       <div>
-        <input class="inputField" type="password" placeholder="Your password" v-model="password" />
+        <input class="inputField" type="password" :placeholder="t('auth.passwordPlaceholder')" v-model="password" />
       </div>
       <div>
         <button @click="handleLogin" class="button" :disabled="loading">
-          {{ loading ? 'Loading' : 'Login' }}
+          {{ loading ? (locale === 'zh' ? '请稍候...' : 'Loading...') : t('auth.signInBtn') }}
         </button>
       </div>
        <div>
-        <button @click="handleRegister" class="button" :disabled="loading">
-          {{ loading ? 'Loading' : 'Register' }}
+        <button @click="handleRegister" class="button button-secondary-auth" :disabled="loading">
+          {{ loading ? (locale === 'zh' ? '请稍候...' : 'Loading...') : t('auth.registerBtn') }}
         </button>
       </div>
       <div class="oauth-buttons">
         <button @click="signInWithOAuth('google')" class="button oauth-google" :disabled="loading">
-          Sign in with Google
+          {{ t('auth.oauthGoogle') }}
         </button>
         <button @click="signInWithOAuth('github')" class="button oauth-github" :disabled="loading">
-          Sign in with GitHub
+          {{ t('auth.oauthGithub') }}
         </button>
       </div>
       <div class="back-link">
-        <button @click="navigateTo('/')" class="button-link">Back to Home</button>
+        <button @click="navigateTo('/')" class="button-link">&larr; {{ t('nav.backHome') }}</button>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* 样式与原文件保持一致 */
 .auth-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
-  background-color: #f0f2f5;
+  min-height: calc(100vh - 80px);
+  padding: 24px;
+  background-color: var(--bg-canvas);
 }
 .auth-card {
-  padding: 2rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 2.2rem 2rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-md);
   text-align: center;
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
 }
 .header {
-  font-size: 2rem;
-  font-weight: bold;
-  margin-bottom: 0.5rem;
+  font-size: 1.65rem;
+  font-weight: 800;
+  margin-bottom: 0.4rem;
+  color: var(--text-main);
+  letter-spacing: -0.02em;
 }
 .description {
-  margin-bottom: 1.5rem;
-  color: #666;
+  margin-bottom: 1.8rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
 }
 .inputField {
-  width: calc(100% - 20px);
-  padding: 10px;
+  width: 100%;
+  padding: 10px 14px;
   margin-bottom: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-base);
+  background: var(--bg-input);
+  color: var(--text-main);
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+.inputField:focus {
+  background: var(--bg-surface);
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-primary-light);
 }
 .button {
   width: 100%;
-  padding: 10px;
+  padding: 10px 16px;
   border: none;
-  border-radius: 4px;
-  background-color: #3e635f;
-  color: white;
+  border-radius: var(--radius-base);
+  background-color: var(--accent-primary);
+  color: #ffffff;
   cursor: pointer;
-  font-size: 1rem;
-  margin-bottom: 1rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.15s ease;
+}
+.button:hover:not(:disabled) {
+  background-color: var(--accent-primary-hover);
 }
 .button:disabled {
-  background-color: #999;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .oauth-buttons {
   margin-top: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 0.75rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border-subtle);
 }
 .oauth-google {
-  background-color: #db4437; /* Google red */
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
 }
-.oauth-google:hover {
-  background-color: #c23321;
+.oauth-google:hover:not(:disabled) {
+  background-color: var(--bg-surface-subtle);
+  border-color: var(--border-focus);
+  color: var(--accent-primary);
 }
 .oauth-github {
-  background-color: #333; /* GitHub dark gray */
+  background-color: var(--bg-surface-subtle);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
 }
-.oauth-github:hover {
-  background-color: #000;
+.oauth-github:hover:not(:disabled) {
+  background-color: var(--border-subtle);
 }
 .back-link {
-  margin-top: 1.5rem;
+  margin-top: 1.6rem;
 }
 .button-link {
   background: none;
   border: none;
-  color: #3e635f;
-  text-decoration: underline;
+  color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: color 0.15s ease;
+}
+.button-link:hover {
+  color: var(--accent-primary);
 }
 </style>

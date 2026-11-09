@@ -1,66 +1,175 @@
-/* 基础重置与全局样式 */
+/* ===================================================================
+   Wind Literary Paper & Academic Scroll Design System
+   参考 古籍经卷/古籍装帧/Savor-Wind 质感原理：
+   宣纸麻米底色 + 温润道林书页 + 松烟墨文字 + 金石印泥朱砂红 + 古铜青金
+   =================================================================== */
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  color-scheme: light;
+
+  /* 1. 书卷纸质底色系统 (Parchment & Vellum Foundations) */
+  --bg-canvas: #f5f2eb;              /* 全局宣纸底色 (Warm Linen / Antique Parchment Canvas) */
+  --bg-surface: #fdfbf7;             /* 主卡片温润书页内页白 (Warm Vellum Book Page) */
+  --bg-surface-subtle: #eee8de;      /* 次级轻量面板与古纸封底 (Aged Paper / Subtle Panel) */
+  --bg-input: #f8f5ee;               /* 输入控件纸浆温润底色 (Soft Warm Parchment Field) */
+  --bg-glass: rgba(245, 242, 235, 0.93); /* 顶栏磨砂古籍透光层 (Translucent Vellum Header) */
+
+  /* 2. 墨色文字系统 (Sumi & Sepia Ink Typography) */
+  --text-main: #1f1d1a;              /* 正文深墨黑 (Deep Sumi Ink Black) */
+  --text-secondary: #4a453f;         /* 次级文字松烟墨 (Sepia Charcoal / Secondary Ink) */
+  --text-muted: #7e766c;             /* 卷帙注解、题注淡墨 (Muted Manuscript Note) */
+  --text-disabled: #b3aba0;          /* 弱化占位浅墨 (Faded Ink Placeholder) */
+
+  /* 3. 印泥与金石点睛色 (Cinnabar Seal Red & Rubrication) */
+  --accent-primary: #c24128;         /* 印泥朱砂红 (Cinnabar Vermilion Stamp Red) */
+  --accent-primary-hover: #aa331c;   /* 浓郁印泥深红 (Deep Seal Crimson) */
+  --accent-primary-light: rgba(194, 65, 40, 0.08); /* 柔和朱印微光背景 (Soft Vermilion Wash) */
+  --accent-primary-border: rgba(194, 65, 40, 0.22); /* 朱泥印圈微边 (Stamp Ring Border) */
+
+  /* 4. 辅助典籍色 (Antique Bronze & Imperial Ochre) */
+  --accent-secondary: #9e6b28;       /* 古铜金/焙茶黄 (Antique Bronze / Scroll Rod Gold) */
+  --accent-secondary-hover: #82541c;
+  --accent-secondary-light: rgba(158, 107, 40, 0.09);
+
+  /* 5. 语义反馈 (草木青黛与赭石红) */
+  --feedback-success: #286a3b;       /* 青竹绿 (Bamboo / Scholar Green) */
+  --feedback-success-bg: rgba(40, 106, 59, 0.08);
+  --feedback-success-border: rgba(40, 106, 59, 0.22);
+
+  --feedback-error: #b03222;         /* 赭石朱红 (Ochre Crimson) */
+  --feedback-error-bg: rgba(176, 50, 34, 0.08);
+  --feedback-error-border: rgba(176, 50, 34, 0.22);
+
+  /* 6. 纸张边缘与典籍微阴影 (Book Deckled Edge & Paper Shadows) */
+  --border-subtle: #eae2d3;          /* 细致裁纸线 (Fine Deckle Edge) */
+  --border-color: #ded5c4;           /* 典籍边缘包边线 (Bookbinding Margin Rule) */
+  --border-focus: #c24128;           /* 朱砂焦点圈 */
+
+  /* 卷轴层次、叠纸与古籍内陷纸晕阴影 */
+  --shadow-sm: 0 1px 3px rgba(31, 29, 26, 0.04), 0 1px 2px rgba(31, 29, 26, 0.03);
+  --shadow-md: 0 4px 18px -2px rgba(31, 29, 26, 0.07), 0 2px 6px -1px rgba(31, 29, 26, 0.04);
+  --shadow-paper: 0 1px 4px rgba(31, 29, 26, 0.04), 0 8px 24px -4px rgba(31, 29, 26, 0.07), inset 0 0 35px rgba(215, 203, 185, 0.16);
+  --shadow-stacked: 0 3px 12px rgba(31, 29, 26, 0.07), 0 1px 3px rgba(31, 29, 26, 0.04);
+
+  --radius-base: 6px;
+  --radius-card: 9px;
+
+  /* 7. 书卷字体系统 (Editorial Literary & Academic Typography) */
+  --font-serif: "Newsreader", "Source Han Serif SC", "Songti SC", "Noto Serif SC", "STSong", "Georgia", "Baskerville", serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Noto Sans SC", sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+/* ================= 全局排版与重置 ================= */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-sans);
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: 0.02em;
+  line-height: 1.7;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
+  color: var(--text-main);
+  background-color: var(--bg-canvas);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  /* 移除 display: flex; place-items: center; 以适应多页面布局 */
+  background-color: var(--bg-canvas);
+  background-image: radial-gradient(ellipse at 50% 0%, rgba(255, 253, 248, 0.45) 0%, rgba(226, 218, 204, 0.18) 100%);
+  color: var(--text-main);
+  position: relative;
+  overflow-x: hidden;
 }
 
+/* 
+ * 核心技法 1: 全屏正片叠底顶层温润纸卷微质感 (Savor-Wind Paper Texture Overlay)
+ * 1. 位于最顶层 (z-index: 9999 + pointer-events: none)，覆盖全局
+ * 2. 绝对定位挂载在页面框架 (.app-layout) 内：与页面内容 100% 同步物理跟随滚动，
+ *    相对位置完全固定，如纸卷印刷般自然！
+ * 3. 采用原生 32-bit 透明纸浆微粒 (savor-wind.png)，140px 140px 平铺间距，opacity: 0.85
+ *    呈现高档道林纸/鸟取和纸般的温润、干净、柔和触感
+ */
+#paper-texture-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  background-image: url('/textures/savor-wind.png');
+  background-repeat: repeat;
+  background-size: 140px 140px;
+  opacity: 0.85;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* 书卷排版通用类 */
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+/* 代码与公式字体 */
+code, pre, kbd, samp {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  line-height: 1.55;
+  letter-spacing: 0;
+}
+
+/* 链接基础样式 */
 a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+  color: var(--accent-primary);
+  text-decoration: none;
+  transition: color 0.15s ease, opacity 0.15s ease;
 }
+
 a:hover {
-  color: #535bf2;
+  color: var(--accent-primary-hover);
 }
 
+/* 按钮通用 */
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  border-radius: var(--radius-base);
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
+  transition: all 0.15s ease;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+/* 卷轴细致双线分割线 (Double Editorial Rule) */
+.book-double-rule {
+  border: none;
+  border-top: 3px double var(--border-color);
+  height: 0;
+  margin: 20px 0;
 }
 
-/* 辅助类 */
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
+/* Wind 纸质微滚动条 */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d4ccbd;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b8ad9a;
 }

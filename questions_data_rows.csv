@@ -1,4 +1,4 @@
-id,paper_filename,question_raw_number,score,start_y,start_page,end_y,end_page,details,ms_box,ms_start_page,ms_details,question_vector,ms_vector
+id,paper_filename,question_raw_number,score,start_y,start_page,end_y,end_page,details,ms_box,ms_start_page,ms_details
 9618_s22_qp_11_1_a,9618_s22_qp_11.pdf,1(a),1,89.3111,2,152.689,2,"(a) State the difference between a tebibyte and a terabyte.
  ...................................................................................................................................................
  ............................................................................................................................................. [1]","[70.14299774169922, 90.0, 541.2634887695312, 126.10650634765625]",3,"1(a) 

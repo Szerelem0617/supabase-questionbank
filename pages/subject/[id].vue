@@ -1,4 +1,5 @@
 <script setup>
+const { t } = useI18n()
 const route = useRoute()
 const subjectId = ref(decodeURIComponent(route.params.id || ''))
 
@@ -11,8 +12,13 @@ useSeoMeta({
 <template>
   <div class="subject-container">
     <div class="header">
-      <NuxtLink to="/" class="back-link">&larr; All Exam Series</NuxtLink>
-      <h1 class="title">{{ subjectId }}</h1>
+      <NuxtLink to="/" class="back-link">
+        <span class="back-arrow">&larr;</span> {{ t('nav.allSpecs') }}
+      </NuxtLink>
+      <div class="title-row">
+        <div class="subject-indicator"></div>
+        <h1 class="title">{{ subjectId }}</h1>
+      </div>
     </div>
     
     <QuestionGallery :subjectId="subjectId" />
@@ -21,36 +27,58 @@ useSeoMeta({
 
 <style scoped>
 .subject-container {
-  max-width: 1300px;
+  max-width: 980px;
   margin: 0 auto;
-  padding: 24px 20px;
+  padding: 24px 20px 60px;
 }
 
 .header {
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 22px;
 }
 
 .back-link {
-  display: inline-block;
-  margin-bottom: 8px;
-  color: #3e635f;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
   text-decoration: none;
   font-weight: 600;
-  font-size: 0.95rem;
-  transition: color 0.15s;
+  font-size: 0.88rem;
+  margin-bottom: 12px;
+  transition: color 0.15s ease;
 }
 
 .back-link:hover {
-  color: #243d3a;
-  text-decoration: underline;
+  color: var(--accent-primary);
+}
+
+.back-arrow {
+  transition: transform 0.15s ease;
+}
+
+.back-link:hover .back-arrow {
+  transform: translateX(-3px);
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.subject-indicator {
+  width: 4px;
+  height: 26px;
+  background: var(--accent-primary);
+  border-radius: 2px;
 }
 
 .title {
+  font-family: var(--font-serif);
   margin: 0;
-  font-size: 1.8rem;
-  color: #0f172a;
-  font-weight: 800;
+  font-size: 1.85rem;
+  color: var(--text-main);
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 </style>
