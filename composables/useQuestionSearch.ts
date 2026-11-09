@@ -175,7 +175,7 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
 
     for (const item of items) {
       if (!item) continue
-      const group = getPaperGroup(item.paper_filename, item.id, item.paper_type, item.series)
+      const group = getPaperGroup(item.paper_filename, item.id, item.paper_type, item.series, item.image_path)
       if (item.paper_type === 'SQ') {
         if (!sqMap.has(group.value)) sqMap.set(group.value, group)
       } else if (item.paper_type === 'MCQ') {
@@ -199,7 +199,7 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
       const filtered = inMemoryCatalog.value.filter(item => {
         if (item.paper_type !== 'MCQ') return false
         if (paper) {
-          const group = getPaperGroup(item.paper_filename, item.id, item.paper_type, item.series)
+          const group = getPaperGroup(item.paper_filename, item.id, item.paper_type, item.series, item.image_path)
           if (group.value !== paper && item.paper_filename !== paper) return false
         }
 
@@ -262,7 +262,7 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
 
     for (const row of sqRows) {
       if (paper) {
-        const group = getPaperGroup(row.paper_filename, row.id, row.paper_type, row.series)
+        const group = getPaperGroup(row.paper_filename, row.id, row.paper_type, row.series, row.image_path)
         if (group.value !== paper && row.paper_filename !== paper) continue
       }
 

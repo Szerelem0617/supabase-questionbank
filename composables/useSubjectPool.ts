@@ -245,7 +245,7 @@ export function useSubjectPool(client: any) {
       if (r.paper_filename) {
         papers.add(r.paper_filename)
       }
-      const group = getPaperGroup(r.paper_filename, r.id, r.paper_type, r.series)
+      const group = getPaperGroup(r.paper_filename, r.id, r.paper_type, r.series, r.image_path)
       if (r.paper_type === 'SQ') {
         if (!sqMap.has(group.value)) sqMap.set(group.value, group)
       } else if (r.paper_type === 'MCQ') {
