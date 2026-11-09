@@ -32,9 +32,16 @@ const emit = defineEmits(['search'])
         />
         <button v-if="sqKeyword" @click="sqKeyword = ''" class="clear-btn">&times;</button>
       </div>
-      <select v-model="sqSelectedPaper" class="paper-dropdown" :title="t('search.sqPaperPlaceholder')">
-        <option value="">{{ t('search.allPapers') }} ({{ sqPaperOptions.length }})</option>
-        <option v-for="p in sqPaperOptions" :key="p" :value="p">{{ p }}</option>
+      <select 
+        v-model="sqSelectedPaper" 
+        class="paper-dropdown" 
+        :title="t('search.sqPaperPlaceholder')"
+        @change="emit('search', 'SQ')"
+      >
+        <option value="">{{ locale === 'zh' ? '全部卷种' : 'All Papers' }}</option>
+        <option v-for="opt in sqPaperOptions" :key="opt.value || opt" :value="opt.value || opt">
+          {{ opt.label || opt.value || opt }}
+        </option>
       </select>
       <button 
         @click="emit('search', 'SQ')" 
@@ -59,9 +66,16 @@ const emit = defineEmits(['search'])
         />
         <button v-if="mcqKeyword" @click="mcqKeyword = ''" class="clear-btn">&times;</button>
       </div>
-      <select v-model="mcqSelectedPaper" class="paper-dropdown" :title="t('search.mcqPaperPlaceholder')">
-        <option value="">{{ t('search.allPapers') }} ({{ mcqPaperOptions.length }})</option>
-        <option v-for="p in mcqPaperOptions" :key="p" :value="p">{{ p }}</option>
+      <select 
+        v-model="mcqSelectedPaper" 
+        class="paper-dropdown" 
+        :title="t('search.mcqPaperPlaceholder')"
+        @change="emit('search', 'MCQ')"
+      >
+        <option value="">{{ locale === 'zh' ? '全部卷种' : 'All Papers' }}</option>
+        <option v-for="opt in mcqPaperOptions" :key="opt.value || opt" :value="opt.value || opt">
+          {{ opt.label || opt.value || opt }}
+        </option>
       </select>
       <button 
         @click="emit('search', 'MCQ')" 

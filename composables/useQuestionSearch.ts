@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { fetchAllSubjectRows } from '~/composables/useSubjectPool'
+import { getPaperGroup, type PaperGroupOption } from '~/composables/usePaperGroup'
 
 // Native Lightweight IndexedDB Storage (0 extra bundles, ~0ms access)
 function openDB(dbName: string, storeName: string): Promise<IDBDatabase> {
@@ -88,7 +89,7 @@ function parseSearchQuery(rawKw: string): ParsedQuery {
   const hasPlus = trimmed.includes('+')
   const tokens = hasPlus
     ? trimmed.split('+').map(t => t.trim().toLowerCase()).filter(Boolean)
-    : trimmed.split(/\s+/).map(t => t.trim().toLowerCase()).filter(Boolean)
+    : (trimmed ? [trimmed.toLowerCase()] : [])
 
   const isPureNumber = /^[qQ]?\d+[a-z0-9()]*$/i.test(trimmed)
   const numMatch = trimmed.match(/^[qQ]?(\d+)/)
@@ -107,11 +108,11 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
   const { t, locale } = useI18n()
   const sqKeyword = ref('')
   const sqSelectedPaper = ref('')
-  const sqPaperOptions = ref<string[]>([])
+  const sqPaperOptions = ref<PaperGroupOption[]>([])
 
   const mcqKeyword = ref('')
   const mcqSelectedPaper = ref('')
-  const mcqPaperOptions = ref<string[]>([])
+  const mcqPaperOptions = ref<PaperGroupOption[]>([])
 
   // In-Memory Catalog State
   const inMemoryCatalog = ref<any[]>([])
@@ -169,16 +170,22 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
   }
 
   function populatePaperOptions(items: any[]) {
-    const sqSet = new Set<string>()
-    const mcqSet = new Set<string>()
+    const sqMap = new Map<string, PaperGroupOption>()
+    const mcqMap = new Map<string, PaperGroupOption>()
+
     for (const item of items) {
-      if (item.paper_filename) {
-        if (item.paper_type === 'SQ') sqSet.add(item.paper_filename)
-        if (item.paper_type === 'MCQ') mcqSet.add(item.paper_filename)
+      if (!item) continue
+      const group = getPaperGroup(item.paper_filename, item.id, item.paper_type, item.series)
+      if (item.paper_type === 'SQ') {
+        if (!sqMap.has(group.value)) sqMap.set(group.value, group)
+      } else if (item.paper_type === 'MCQ') {
+        if (!mcqMap.has(group.value)) mcqMap.set(group.value, group)
       }
     }
-    sqPaperOptions.value = Array.from(sqSet).sort()
-    mcqPaperOptions.value = Array.from(mcqSet).sort()
+
+    const sortFn = (a: PaperGroupOption, b: PaperGroupOption) => a.value.localeCompare(b.value, undefined, { numeric: true })
+    sqPaperOptions.value = Array.from(sqMap.values()).sort(sortFn)
+    mcqPaperOptions.value = Array.from(mcqMap.values()).sort(sortFn)
   }
 
   // Lighting-Fast In-Memory Search (~1ms execution)
@@ -191,7 +198,10 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
     if (type === 'MCQ') {
       const filtered = inMemoryCatalog.value.filter(item => {
         if (item.paper_type !== 'MCQ') return false
-        if (paper && item.paper_filename !== paper) return false
+        if (paper) {
+          const group = getPaperGroup(item.paper_filename, item.id, item.paper_type, item.series)
+          if (group.value !== paper && item.paper_filename !== paper) return false
+        }
 
         if (parsed.mode === 'qp') {
           if (!parsed.qpQuery) return true
@@ -251,7 +261,10 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
     }>()
 
     for (const row of sqRows) {
-      if (paper && row.paper_filename !== paper) continue
+      if (paper) {
+        const group = getPaperGroup(row.paper_filename, row.id, row.paper_type, row.series)
+        if (group.value !== paper && row.paper_filename !== paper) continue
+      }
 
       const mainNum = getMainQuestionNumber(row.question_raw_number)
       const groupKey = `${row.paper_filename}___${mainNum}`
@@ -432,7 +445,15 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
         .eq('paper_type', searchActiveType.value)
 
       if (searchActivePaper.value) {
-        query = query.eq('paper_filename', searchActivePaper.value)
+        const pVal = searchActivePaper.value.toLowerCase()
+        if (pVal.startsWith('p') && /^p\d+$/.test(pVal)) {
+          const pNum = pVal.slice(1)
+          query = query.or(`paper_filename.ilike.%_qp_${pNum}%,paper_filename.ilike.%_qp_${pNum}%.pdf,paper_filename.ilike.%_p${pNum}%`)
+        } else if (pVal.startsWith('u') && /^u\d+$/.test(pVal)) {
+          query = query.ilike('paper_filename', `%_${pVal}%`)
+        } else {
+          query = query.eq('paper_filename', searchActivePaper.value)
+        }
       } else if (getSeries && getSeries()) {
         query = query.eq('series', getSeries())
       }
@@ -446,8 +467,13 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
         if (parsed.isPureNumber && parsed.baseNum) {
           query = query.or(`question_raw_number.eq.${parsed.baseNum},question_raw_number.ilike.${parsed.baseNum}(%,id.ilike.%_q${parsed.baseNum}%`)
         } else {
-          const wildcardJoined = parsed.tokens.join('%')
-          query = query.or(`id.ilike.%${wildcardJoined}%,paper_filename.ilike.%${wildcardJoined}%,details.ilike.%${wildcardJoined}%`)
+          if (parsed.tokens.length === 1) {
+            const kw = parsed.tokens[0]
+            query = query.or(`id.ilike.%${kw}%,paper_filename.ilike.%${kw}%,details.ilike.%${kw}%`)
+          } else {
+            const wildcardJoined = parsed.tokens.join('%')
+            query = query.or(`id.ilike.%${wildcardJoined}%,paper_filename.ilike.%${wildcardJoined}%,details.ilike.%${wildcardJoined}%`)
+          }
         }
       }
 

@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { getPaperGroup, type PaperGroupOption } from '~/composables/usePaperGroup'
 
 export interface QuestionGroup {
   id: string
@@ -147,8 +148,8 @@ export function useSubjectPool(client: any) {
   const isPoolLoading = ref(false)
   const isPoolReady = ref(false)
   const availablePapers = ref<string[]>([])
-  const sqPaperOptions = ref<string[]>([])
-  const mcqPaperOptions = ref<string[]>([])
+  const sqPaperOptions = ref<PaperGroupOption[]>([])
+  const mcqPaperOptions = ref<PaperGroupOption[]>([])
 
   // Preload adjacent images into browser cache so clicking Next/Prev has 0 image latency
   function preloadAdjacentImages(idx: number, cdnBase: string, r2DevUrl: string) {
@@ -237,20 +238,25 @@ export function useSubjectPool(client: any) {
 
   function extractPaperOptions(rows: any[]) {
     const papers = new Set<string>()
-    const sqSet = new Set<string>()
-    const mcqSet = new Set<string>()
+    const sqMap = new Map<string, PaperGroupOption>()
+    const mcqMap = new Map<string, PaperGroupOption>()
 
     for (const r of rows) {
       if (r.paper_filename) {
         papers.add(r.paper_filename)
-        if (r.paper_type === 'SQ') sqSet.add(r.paper_filename)
-        if (r.paper_type === 'MCQ') mcqSet.add(r.paper_filename)
+      }
+      const group = getPaperGroup(r.paper_filename, r.id, r.paper_type, r.series)
+      if (r.paper_type === 'SQ') {
+        if (!sqMap.has(group.value)) sqMap.set(group.value, group)
+      } else if (r.paper_type === 'MCQ') {
+        if (!mcqMap.has(group.value)) mcqMap.set(group.value, group)
       }
     }
 
+    const sortFn = (a: PaperGroupOption, b: PaperGroupOption) => a.value.localeCompare(b.value, undefined, { numeric: true })
     availablePapers.value = Array.from(papers).sort()
-    sqPaperOptions.value = Array.from(sqSet).sort()
-    mcqPaperOptions.value = Array.from(mcqSet).sort()
+    sqPaperOptions.value = Array.from(sqMap.values()).sort(sortFn)
+    mcqPaperOptions.value = Array.from(mcqMap.values()).sort(sortFn)
   }
 
   return {

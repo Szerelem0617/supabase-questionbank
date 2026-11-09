@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import SqQuestionSheet from './SqQuestionSheet.vue'
 import McqQuestionView from './McqQuestionView.vue'
+import { formatPaperGroupLabel } from '~/composables/usePaperGroup'
 
 const { t, locale } = useI18n()
 
@@ -243,7 +244,7 @@ defineExpose({
               <strong>{{ t('search.foundCount', { count: searchTotalCount }) }}</strong>
             </template>
             <span v-if="searchActiveKeyword" class="search-kw-tag">"{{ searchActiveKeyword }}"</span>
-            <span v-if="searchActivePaper" class="search-paper-tag">📄 {{ searchActivePaper }}</span>
+            <span v-if="searchActivePaper" class="search-paper-tag">📄 {{ formatPaperGroupLabel(searchActivePaper) }}</span>
           </span>
         </div>
         <button @click="emit('exit-search')" class="btn-exit-mode" :title="t('search.returnToQuestion')">
