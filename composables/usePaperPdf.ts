@@ -7,7 +7,7 @@ export interface PaperPdfLinks {
   msName: string | null
 }
 
-const manifest = ref<Record<string, [string | null, string | null]>>({})
+const manifest = ref<Record<string, any>>({})
 let isLoaded = false
 let loadPromise: Promise<void> | null = null
 
@@ -74,25 +74,45 @@ export function usePaperPdf() {
       }
     }
 
-    // 3. Fallback from ID (e.g. 9702_s24_13_q25 -> 9702_s24_qp_13)
+    // 3. Fallback from ID (e.g. 9702_s24_13_q25 -> 9702_s24_qp_13 or 0625_w20_61_q1 -> 0625_w20_qp_61)
     if (questionData.id) {
-      const parts = String(questionData.id).split('_')
+      const qid = String(questionData.id)
+      const parts = qid.split('_')
       if (parts.length >= 3 && /^\d+$/.test(parts[2])) {
         candidates.push(`${parts[0]}_${parts[1]}_qp_${parts[2]}`)
+      }
+      const seasonMatch = qid.match(/^([a-z0-9]+)_([wsmWSM]\d{2})_([1-6]\d)/i)
+      if (seasonMatch) {
+        candidates.push(`${seasonMatch[1]}_${seasonMatch[2]}_qp_${seasonMatch[3]}`)
+        candidates.push(`${seasonMatch[1]}_${seasonMatch[2]}_${seasonMatch[3]}`)
       }
     }
 
     // Look up in manifest
     for (const key of candidates) {
-      if (manifest.value[key]) {
-        const [qpRel, msRel] = manifest.value[key]
-        const qpName = qpRel ? qpRel.split('/').pop() || 'Question Paper' : null
-        const msName = msRel ? msRel.split('/').pop() || 'Mark Scheme' : null
-        return {
-          qpUrl: buildUrl(qpRel),
-          msUrl: buildUrl(msRel),
-          qpName,
-          msName
+      const entry: any = manifest.value[key]
+      if (entry) {
+        if (Array.isArray(entry)) {
+          const [qpRel, msRel] = entry
+          const qpName = qpRel ? qpRel.split('/').pop() || 'Question Paper' : null
+          const msName = msRel ? msRel.split('/').pop() || 'Mark Scheme' : null
+          return {
+            qpUrl: buildUrl(qpRel),
+            msUrl: buildUrl(msRel),
+            qpName,
+            msName
+          }
+        } else if (typeof entry === 'object') {
+          const qpUrl = entry.qp_url || buildUrl(entry.qp_key)
+          const msUrl = entry.ms_url || buildUrl(entry.ms_key)
+          const qpName = entry.qp_key ? entry.qp_key.split('/').pop() : (qpUrl ? qpUrl.split('/').pop() : 'Question Paper')
+          const msName = entry.ms_key ? entry.ms_key.split('/').pop() : (msUrl ? msUrl.split('/').pop() : 'Mark Scheme')
+          return {
+            qpUrl,
+            msUrl,
+            qpName,
+            msName
+          }
         }
       }
     }

@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { getPaperGroup, type PaperGroupOption } from '~/composables/usePaperGroup'
+import { getPaperGroup, normalizePaperType, type PaperGroupOption } from '~/composables/usePaperGroup'
 
 export interface QuestionGroup {
   id: string
@@ -68,15 +68,16 @@ export function groupQuestionsData(rows: any[]): QuestionGroup[] {
   const groupMap = new Map<string, QuestionGroup>()
 
   for (const row of rows) {
-    const mainNum = row.paper_type === 'SQ' ? getMainQuestionNumber(row.question_raw_number) : (row.question_raw_number || row.id)
-    const groupKey = `${row.paper_filename}___${mainNum}___${row.paper_type}`
+    const pType = normalizePaperType(row.paper_type, row.paper_filename, row.id, row.series, row.image_path)
+    const mainNum = pType === 'SQ' ? getMainQuestionNumber(row.question_raw_number) : (row.question_raw_number || row.id)
+    const groupKey = `${row.paper_filename}___${mainNum}___${pType}`
 
     if (!groupMap.has(groupKey)) {
       groupMap.set(groupKey, {
         id: row.id,
         series: row.series,
         paper_filename: row.paper_filename,
-        paper_type: row.paper_type,
+        paper_type: pType,
         main_question_number: mainNum,
         question_raw_number: row.question_raw_number,
         score: row.score || 0,
@@ -245,10 +246,11 @@ export function useSubjectPool(client: any) {
       if (r.paper_filename) {
         papers.add(r.paper_filename)
       }
-      const group = getPaperGroup(r.paper_filename, r.id, r.paper_type, r.series, r.image_path)
-      if (r.paper_type === 'SQ') {
+      const pType = normalizePaperType(r.paper_type, r.paper_filename, r.id, r.series, r.image_path)
+      const group = getPaperGroup(r.paper_filename, r.id, pType, r.series, r.image_path)
+      if (pType === 'SQ') {
         if (!sqMap.has(group.value)) sqMap.set(group.value, group)
-      } else if (r.paper_type === 'MCQ') {
+      } else if (pType === 'MCQ') {
         if (!mcqMap.has(group.value)) mcqMap.set(group.value, group)
       }
     }

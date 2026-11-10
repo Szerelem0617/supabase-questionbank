@@ -135,3 +135,39 @@ export function getPaperGroup(
 
   return { value: 'all', label: 'All Papers' }
 }
+
+export function normalizePaperType(
+  rawType?: string,
+  filename?: string,
+  qid?: string,
+  series?: string,
+  imagePath?: string
+): 'SQ' | 'MCQ' {
+  const t = String(rawType || '').trim().toUpperCase()
+  if (t === 'MCQ') return 'MCQ'
+  if (t === 'SQ') return 'SQ'
+
+  // Extract paper group
+  const group = getPaperGroup(filename, qid, rawType, series, imagePath)
+  const fn = String(filename || '').toLowerCase()
+  const id = String(qid || '').toLowerCase()
+  const ser = String(series || '').toLowerCase()
+
+  // CAIE 0625 IGCSE: Paper 1 & 2 are MCQ; Paper 3, 4, 6 are SQ!
+  if (ser.includes('0625') || fn.includes('0625') || id.includes('0625')) {
+    if (group.value === 'p1' || group.value === 'p2') return 'MCQ'
+    if (['p3', 'p4', 'p6'].includes(group.value)) return 'SQ'
+  }
+
+  // CAIE 9702 A Level: Paper 1 is MCQ; Paper 2, 3, 4, 5 are SQ!
+  if (ser.includes('9702') || fn.includes('9702') || id.includes('9702')) {
+    if (group.value === 'p1') return 'MCQ'
+    if (['p2', 'p3', 'p4', 'p5'].includes(group.value)) return 'SQ'
+  }
+
+  // General fallback by paper component (Paper 2, 3, 4, 5, 6 are SQ)
+  if (['p2', 'p3', 'p4', 'p5', 'p6'].includes(group.value)) return 'SQ'
+  if (group.value === 'p1') return 'MCQ'
+
+  return 'SQ'
+}

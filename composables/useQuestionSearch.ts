@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { fetchAllSubjectRows } from '~/composables/useSubjectPool'
-import { getPaperGroup, type PaperGroupOption } from '~/composables/usePaperGroup'
+import { getPaperGroup, normalizePaperType, type PaperGroupOption } from '~/composables/usePaperGroup'
 
 // Native Lightweight IndexedDB Storage (0 extra bundles, ~0ms access)
 function openDB(dbName: string, storeName: string): Promise<IDBDatabase> {
@@ -175,10 +175,11 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
 
     for (const item of items) {
       if (!item) continue
-      const group = getPaperGroup(item.paper_filename, item.id, item.paper_type, item.series, item.image_path)
-      if (item.paper_type === 'SQ') {
+      const pType = normalizePaperType(item.paper_type, item.paper_filename, item.id, item.series, item.image_path)
+      const group = getPaperGroup(item.paper_filename, item.id, pType, item.series, item.image_path)
+      if (pType === 'SQ') {
         if (!sqMap.has(group.value)) sqMap.set(group.value, group)
-      } else if (item.paper_type === 'MCQ') {
+      } else if (pType === 'MCQ') {
         if (!mcqMap.has(group.value)) mcqMap.set(group.value, group)
       }
     }
@@ -197,9 +198,10 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
 
     if (type === 'MCQ') {
       const filtered = inMemoryCatalog.value.filter(item => {
-        if (item.paper_type !== 'MCQ') return false
+        const itemPType = normalizePaperType(item.paper_type, item.paper_filename, item.id, item.series, item.image_path)
+        if (itemPType !== 'MCQ') return false
         if (paper) {
-          const group = getPaperGroup(item.paper_filename, item.id, item.paper_type, item.series, item.image_path)
+          const group = getPaperGroup(item.paper_filename, item.id, itemPType, item.series, item.image_path)
           if (group.value !== paper && item.paper_filename !== paper) return false
         }
 
@@ -250,7 +252,10 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
     }
 
     // --- SQ SEARCH: Big Question Grouping & Matched Sub-part Highlighting ---
-    const sqRows = inMemoryCatalog.value.filter(r => r.paper_type === 'SQ')
+    const sqRows = inMemoryCatalog.value.filter(r => {
+      const pType = normalizePaperType(r.paper_type, r.paper_filename, r.id, r.series, r.image_path)
+      return pType === 'SQ'
+    })
     
     // Group all SQ rows by (paper_filename, main_question_number)
     const groupsMap = new Map<string, {
@@ -448,7 +453,7 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
         const pVal = searchActivePaper.value.toLowerCase()
         if (pVal.startsWith('p') && /^p\d+$/.test(pVal)) {
           const pNum = pVal.slice(1)
-          query = query.or(`paper_filename.ilike.%_qp_${pNum}%,paper_filename.ilike.%_qp_${pNum}%.pdf,paper_filename.ilike.%_p${pNum}%`)
+          query = query.or(`paper_filename.ilike.%_qp_${pNum}%,paper_filename.ilike.%_qp_${pNum}%.pdf,paper_filename.ilike.%_p${pNum}%,paper_filename.ilike.%_${pNum}%.pdf,id.ilike.%_${pNum}%_q%`)
         } else if (pVal.startsWith('u') && /^u\d+$/.test(pVal)) {
           query = query.ilike('paper_filename', `%_${pVal}%`)
         } else {
