@@ -118,12 +118,22 @@ export function getPaperGroup(
     }
   }
 
+  const is0625 = ser.includes('0625') || fn.includes('0625') || id.includes('0625') || img.includes('0625')
+
   if (pNum) {
+    // CAIE IGCSE 0625: Old syllabus MCQ was named Paper 1, but corresponds to modern Paper 2.
+    // Map any 0625 Paper 1 to Paper 2 so there is NO Paper 1 option for 0625.
+    if (is0625 && pNum === '1') {
+      pNum = '2'
+    }
     return { value: `p${pNum}`, label: `Paper ${pNum}` }
   }
 
   // If paper_type is MCQ and no other pattern matched:
   if (paperType === 'MCQ' || target.includes('mcq')) {
+    if (is0625) {
+      return { value: 'p2', label: 'Paper 2' }
+    }
     return { value: 'p1', label: 'Paper 1' }
   }
 

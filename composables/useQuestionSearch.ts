@@ -453,7 +453,13 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
         const pVal = searchActivePaper.value.toLowerCase()
         if (pVal.startsWith('p') && /^p\d+$/.test(pVal)) {
           const pNum = pVal.slice(1)
-          query = query.or(`paper_filename.ilike.%_qp_${pNum}%,paper_filename.ilike.%_qp_${pNum}%.pdf,paper_filename.ilike.%_p${pNum}%,paper_filename.ilike.%_${pNum}%.pdf,id.ilike.%_${pNum}%_q%`)
+          const seriesStr = String(getSeries ? getSeries() : '').toLowerCase()
+          const is0625 = seriesStr.includes('0625')
+          if (is0625 && pNum === '2') {
+            query = query.or(`paper_filename.ilike.%_qp_2%,paper_filename.ilike.%_qp_1%,paper_filename.ilike.%_qp_2%.pdf,paper_filename.ilike.%_qp_1%.pdf,paper_filename.ilike.%_p2%,paper_filename.ilike.%_p1%,paper_filename.ilike.%_2%.pdf,paper_filename.ilike.%_1%.pdf,id.ilike.%_2%_q%,id.ilike.%_1%_q%`)
+          } else {
+            query = query.or(`paper_filename.ilike.%_qp_${pNum}%,paper_filename.ilike.%_qp_${pNum}%.pdf,paper_filename.ilike.%_p${pNum}%,paper_filename.ilike.%_${pNum}%.pdf,id.ilike.%_${pNum}%_q%`)
+          }
         } else if (pVal.startsWith('u') && /^u\d+$/.test(pVal)) {
           query = query.ilike('paper_filename', `%_${pVal}%`)
         } else {
