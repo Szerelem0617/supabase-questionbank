@@ -19,7 +19,7 @@ function openPoolDB(): Promise<IDBDatabase> {
     if (typeof window === 'undefined' || !window.indexedDB) {
       return reject(new Error('IndexedDB not supported'))
     }
-    const req = window.indexedDB.open('PhysicsPoolDB', 1)
+    const req = window.indexedDB.open('PhysicsPoolDB_v3', 1)
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains('pools')) {
@@ -187,9 +187,6 @@ export function useSubjectPool(client: any) {
 
     // 1. Try reading from local IndexedDB first (Takes ~2-4ms, 0 network communication!)
     const cachedRows = await getCachedPool(seriesId)
-    // Supabase PostgREST default hard limit is 1000.
-    // If cached rows count is <= 1000 for subjects with more questions, it was truncated by previous buggy code.
-    const isTruncated = cachedRows && cachedRows.length === 1000
 
     if (cachedRows && cachedRows.length > 0) {
       const groups = groupQuestionsData(cachedRows)
@@ -202,8 +199,24 @@ export function useSubjectPool(client: any) {
       }
     }
 
-    // 2. Fetch complete dataset from Supabase using parallel pagination if not cached or cache was truncated
-    if (!cachedRows || cachedRows.length < 5 || isTruncated) {
+    // 2. Check server count to ensure cache is not stale (e.g. newly synced papers) or truncated
+    let needsFetch = !cachedRows || cachedRows.length < 5 || cachedRows.length === 1000
+    if (cachedRows && cachedRows.length > 0 && !needsFetch) {
+      try {
+        const { count: serverCount, error: countErr } = await client
+          .from('questions_data')
+          .select('id', { count: 'exact', head: true })
+          .eq('series', seriesId)
+        if (!countErr && typeof serverCount === 'number' && serverCount !== cachedRows.length) {
+          needsFetch = true
+        }
+      } catch {
+        // Fallback to cache on network failure
+      }
+    }
+
+    // 3. Fetch complete dataset from Supabase using parallel pagination if cache is stale or missing
+    if (needsFetch) {
       try {
         const allRows = await fetchAllSubjectRows(client, seriesId, (firstBatch) => {
           // Deliver first batch immediately to UI if nothing cached
@@ -234,6 +247,8 @@ export function useSubjectPool(client: any) {
       } finally {
         isPoolLoading.value = false
       }
+    } else {
+      isPoolLoading.value = false
     }
   }
 

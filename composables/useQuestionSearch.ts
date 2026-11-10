@@ -21,9 +21,9 @@ function openDB(dbName: string, storeName: string): Promise<IDBDatabase> {
 }
 
 async function getCachedPoolOrCatalog(series: string): Promise<any[] | null> {
-  // 1. Try reading from PhysicsPoolDB first (already populated by useSubjectPool)
+  // 1. Try reading from PhysicsPoolDB_v3 first (already populated by useSubjectPool)
   try {
-    const poolDb = await openDB('PhysicsPoolDB', 'pools')
+    const poolDb = await openDB('PhysicsPoolDB_v3', 'pools')
     const poolData = await new Promise<any[]>((resolve) => {
       const tx = poolDb.transaction('pools', 'readonly')
       const req = tx.objectStore('pools').get(series)
@@ -33,9 +33,9 @@ async function getCachedPoolOrCatalog(series: string): Promise<any[] | null> {
     if (poolData && poolData.length > 0) return poolData
   } catch {}
 
-  // 2. Fallback to PhysicsCatalogDB
+  // 2. Fallback to PhysicsCatalogDB_v3
   try {
-    const catDb = await openDB('PhysicsCatalogDB', 'catalogs')
+    const catDb = await openDB('PhysicsCatalogDB_v3', 'catalogs')
     const catData = await new Promise<any[]>((resolve) => {
       const tx = catDb.transaction('catalogs', 'readonly')
       const req = tx.objectStore('catalogs').get(series)
@@ -50,7 +50,7 @@ async function getCachedPoolOrCatalog(series: string): Promise<any[] | null> {
 
 async function setCachedCatalog(series: string, data: any[]): Promise<void> {
   try {
-    const poolDb = await openDB('PhysicsPoolDB', 'pools')
+    const poolDb = await openDB('PhysicsPoolDB_v3', 'pools')
     const tx = poolDb.transaction('pools', 'readwrite')
     tx.objectStore('pools').put(data, series)
   } catch {}
@@ -138,11 +138,9 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
   // Initialize and warm up catalog for the current series
   async function warmUpCatalog(seriesId: string) {
     if (!seriesId) return
-    if (isCatalogReady.value && inMemoryCatalog.value.length > 1000) return
 
     // 1. Try reading from IndexedDB first (0ms network)
     const cached = await getCachedPoolOrCatalog(seriesId)
-    const isTruncated = cached && cached.length === 1000
 
     if (cached && cached.length > 0) {
       inMemoryCatalog.value = cached
@@ -150,8 +148,22 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
       populatePaperOptions(cached)
     }
 
-    // 2. Fetch fresh complete catalog if not cached or previously truncated to 1000 rows
-    if (!cached || cached.length < 50 || isTruncated) {
+    // 2. Check if server has different count (e.g. newly added papers or truncated)
+    let needsFetch = !cached || cached.length < 50 || cached.length === 1000
+    if (cached && cached.length > 0 && !needsFetch) {
+      try {
+        const { count: serverCount, error: countErr } = await client
+          .from('questions_data')
+          .select('id', { count: 'exact', head: true })
+          .eq('series', seriesId)
+        if (!countErr && typeof serverCount === 'number' && serverCount !== cached.length) {
+          needsFetch = true
+        }
+      } catch {}
+    }
+
+    // 3. Fetch fresh complete catalog if not cached or cache is stale
+    if (needsFetch) {
       isCatalogLoading.value = true
       try {
         const allRows = await fetchAllSubjectRows(client, seriesId)
