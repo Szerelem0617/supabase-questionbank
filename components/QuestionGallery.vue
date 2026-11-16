@@ -96,17 +96,11 @@ const currentStreamQuestions = computed(() => {
 const isStreamLoading = computed(() => {
   if (favoritesStore.isFavoriteMode.value) return false
   if (searchStore.isSearchMode.value) return searchStore.isSearching.value
-  return poolStore.isPoolLoading.value || (!poolStore.isPoolReady.value && poolStore.groupedQuestions.value.length === 0)
+  return false
 })
 
 function initSeedQuestion() {
-  const seed = getSubjectSeedQuestion(props.subjectId)
-  if (seed) {
-    currentQuestionData.value = seed.primaryQuestion
-    groupQuestions.value = seed.groupQuestions
-    loading.value = false
-    loadingText.value = ''
-  }
+  poolStore.initSeedPool(props.subjectId)
 }
 
 // Immediately seed deterministic initial question for 0ms instant display
@@ -599,36 +593,15 @@ watch(selectedPaper, (paper) => {
 })
 
 async function initSubject(seriesId) {
-  initSeedQuestion()
+  poolStore.initSeedPool(seriesId)
   // Warm up search catalog in background
   searchStore.warmUpCatalog(seriesId)
 
-  // Load subject pool: reads from local IndexedDB in ~2-4ms, or parallel fast fetch
-  await poolStore.loadSubjectPool(seriesId, (firstGroup) => {
-    // If subject didn't have a seed question, display first question immediately upon first batch arrival
-    if (!currentQuestionData.value) {
-      displayGroup(firstGroup)
-    }
-  })
-  if (poolStore.groupedQuestions.value.length > 0) {
-    if (!currentQuestionData.value) {
-      displayGroup(poolStore.groupedQuestions.value[0])
-    } else {
-      const seedIdx = poolStore.groupedQuestions.value.findIndex(g => g.id === currentQuestionData.value.id)
-      if (seedIdx >= 0) {
-        poolStore.currentIndex.value = seedIdx
-      }
-    }
-  } else {
-    loading.value = false
-    loadingText.value = 'No questions found for this subject.'
-  }
+  // Load subject pool in background: reads from local IndexedDB in ~2-4ms, or parallel fast fetch
+  poolStore.loadSubjectPool(seriesId)
 }
 
 watch(() => props.subjectId, async (newSubject) => {
-  currentQuestionData.value = null
-  groupQuestions.value = []
-  loading.value = true
   selectedPaper.value = ''
   searchStore.sqKeyword.value = ''
   searchStore.sqSelectedPaper.value = ''
@@ -636,6 +609,7 @@ watch(() => props.subjectId, async (newSubject) => {
   searchStore.mcqSelectedPaper.value = ''
   searchStore.isSearchMode.value = false
   isFavoriteMode.value = false
+  poolStore.initSeedPool(newSubject)
   await initSubject(newSubject)
 })
 

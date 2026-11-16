@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import seedsData from './seedsData.json'
 import { getPaperGroup, normalizePaperType, type PaperGroupOption } from '~/composables/usePaperGroup'
 
 export interface QuestionGroup {
@@ -276,6 +277,20 @@ export function useSubjectPool(client: any) {
     mcqPaperOptions.value = Array.from(mcqMap.values()).sort(sortFn)
   }
 
+  function initSeedPool(seriesId: string) {
+    if (!seriesId) return
+    const rows = (seedsData as Record<string, any[]>)[seriesId]
+    if (rows && rows.length > 0) {
+      const seedGroups = groupQuestionsData(rows)
+      if (seedGroups.length > 0) {
+        groupedQuestions.value = seedGroups
+        currentIndex.value = 0
+        extractPaperOptions(rows)
+        isPoolReady.value = true
+      }
+    }
+  }
+
   return {
     groupedQuestions,
     currentIndex,
@@ -284,6 +299,7 @@ export function useSubjectPool(client: any) {
     availablePapers,
     sqPaperOptions,
     mcqPaperOptions,
+    initSeedPool,
     loadSubjectPool,
     preloadAdjacentImages
   }
