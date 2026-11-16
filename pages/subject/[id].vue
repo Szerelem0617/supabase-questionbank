@@ -1,7 +1,11 @@
 <script setup>
 const { t } = useI18n()
 const route = useRoute()
-const subjectId = ref(decodeURIComponent(route.params.id || ''))
+const subjectId = computed(() => {
+  const id = route.params.id
+  if (Array.isArray(id)) return decodeURIComponent(id[0] || '')
+  return typeof id === 'string' ? decodeURIComponent(id) : ''
+})
 
 useSeoMeta({
   title: () => `${subjectId.value} - Physics Questions & Mark Schemes`,
@@ -21,7 +25,7 @@ useSeoMeta({
       </div>
     </div>
     
-    <QuestionGallery :subjectId="subjectId" />
+    <QuestionGallery :key="subjectId" :subjectId="subjectId" />
   </div>
 </template>
 

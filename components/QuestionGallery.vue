@@ -629,7 +629,6 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (sentinelObserver) sentinelObserver.disconnect()
   if (typeof window !== 'undefined') {
     window.removeEventListener('keydown', handleKeyDown)
     document.removeEventListener('click', handleGlobalClick)
