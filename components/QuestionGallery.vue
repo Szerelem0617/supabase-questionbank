@@ -639,24 +639,11 @@ watch(() => props.subjectId, async (newSubject) => {
   await initSubject(newSubject)
 })
 
-let sentinelObserver = null
-function setupSentinelObserver() {
-  if (typeof document === 'undefined') return
-  const el = document.getElementById('searchSentinelTarget')
-  if (sentinelObserver) sentinelObserver.disconnect()
-  if (el && typeof IntersectionObserver !== 'undefined') {
-    sentinelObserver = new IntersectionObserver((entries) => {
-      if (entries[0]?.isIntersecting) {
-        searchStore.loadMoreSearchResults()
-      }
-    }, { rootMargin: '350px' })
-    sentinelObserver.observe(el)
+function handleStreamLoadMore() {
+  if (searchStore.isSearchMode.value && searchStore.hasMoreSearch.value && !searchStore.isLoadingMore.value) {
+    searchStore.loadMoreSearchResults()
   }
 }
-
-watch(() => searchStore.searchResults.value.length, () => {
-  setTimeout(setupSentinelObserver, 150)
-})
 
 onMounted(async () => {
   favoritesStore.initFavorites()
@@ -727,6 +714,8 @@ onUnmounted(() => {
         :searchTotalCount="searchStore.searchTotalCount.value"
         :searchTotalSubCount="searchStore.searchTotalSubCount.value"
         :isSearching="searchStore.isSearching.value"
+        :hasMoreSearch="searchStore.hasMoreSearch.value"
+        :isLoadingMore="searchStore.isLoadingMore.value"
         :isLoading="isStreamLoading"
         :activeFolder="favoritesStore.activeFolder.value"
         :favFilterSubject="favFilterSubject"
@@ -744,6 +733,7 @@ onUnmounted(() => {
         :newCommentText="newCommentText"
         :submittingComment="submittingComment"
         @update:favFilterSubject="(val) => favFilterSubject = val"
+        @load-more="handleStreamLoadMore"
         @exit-search="searchStore.exitSearchMode()"
         @exit-favorites="isFavoriteMode = false"
         @select-folder="onSelectFolderFromDropdown"

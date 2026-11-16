@@ -22,6 +22,8 @@ const props = defineProps({
   searchTotalCount: { type: Number, default: 0 },
   searchTotalSubCount: { type: Number, default: 0 },
   isSearching: { type: Boolean, default: false },
+  hasMoreSearch: { type: Boolean, default: false },
+  isLoadingMore: { type: Boolean, default: false },
   isLoading: { type: Boolean, default: false },
   // Favorites mode props
   subjectId: { type: String, default: '' },
@@ -45,6 +47,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
+  'load-more',
   'update:selectedPaper',
   'update:favFilterBoard',
   'update:favFilterType',
@@ -90,24 +93,37 @@ const streamItems = computed(() => {
 })
 
 const visibleItems = computed(() => {
+  if (props.mode === 'search') {
+    return streamItems.value
+  }
   return streamItems.value.slice(0, displayedLimit.value)
 })
 
 const hasMoreItems = computed(() => {
+  if (props.mode === 'search') {
+    return props.hasMoreSearch
+  }
   return streamItems.value.length > displayedLimit.value
 })
 
 function loadMoreItems() {
-  if (hasMoreItems.value) {
-    displayedLimit.value = Math.min(displayedLimit.value + 10, streamItems.value.length)
+  if (props.mode === 'search') {
+    if (props.hasMoreSearch && !props.isLoadingMore) {
+      emit('load-more')
+    }
+  } else {
+    if (hasMoreItems.value) {
+      displayedLimit.value = Math.min(displayedLimit.value + 10, streamItems.value.length)
+    }
   }
 }
 
-// Reset displayed limit on dataset changes
-watch(() => [props.mode, props.selectedPaper, props.questions.length, props.filteredFavoriteItems.length], () => {
+// Reset displayed limit on filter/mode changes (do NOT reset on appending items)
+watch(() => [props.mode, props.selectedPaper, props.favFilterSubject, props.searchActiveKeyword, props.searchActivePaper], () => {
   displayedLimit.value = 10
   activeCardIndex.value = 0
   setTimeout(setupCardObserver, 150)
+  setTimeout(setupSentinel, 150)
 })
 
 function setupSentinel() {
