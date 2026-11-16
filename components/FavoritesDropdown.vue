@@ -14,6 +14,7 @@ const route = useRoute()
 
 const isFolderDropdownOpen = ref(false)
 const isCreatingFolder = ref(false)
+const exportMenuFolderId = ref(null)
 const newFolderName = ref('')
 const favDropdownRef = ref(null)
 
@@ -43,7 +44,12 @@ function handleExitFavoriteMode() {
   isFolderDropdownOpen.value = false
 }
 
-function handleExportFolder(folder) {
+function toggleFolderExportMenu(folderId) {
+  exportMenuFolderId.value = exportMenuFolderId.value === folderId ? null : folderId
+}
+
+function handleExportFolder(folder, type = 'questions') {
+  exportMenuFolderId.value = null
   const items = favoritesStore.favorites.value.filter(item => item.folderId === folder.id)
   if (items.length === 0) return
   const folderName = folder.isDefault ? t('galleryNav.defaultFolder') : folder.name
@@ -52,7 +58,8 @@ function handleExportFolder(folder) {
     items,
     cdnBase: cdnBase.value,
     r2DevUrl: r2DevUrl.value,
-    locale: locale.value
+    locale: locale.value,
+    type
   })
 }
 
@@ -105,6 +112,7 @@ function handleGlobalClick(e) {
   if (favDropdownRef.value && !favDropdownRef.value.contains(e.target)) {
     isFolderDropdownOpen.value = false
     isCreatingFolder.value = false
+    exportMenuFolderId.value = null
   }
 }
 
@@ -166,13 +174,15 @@ onUnmounted(() => {
 
         <!-- Folder list -->
         <div class="fav-menu-list">
-          <div 
+          <template 
             v-for="folder in favoritesStore.folders.value" 
             :key="folder.id"
-            class="fav-menu-item"
-            :class="{ 'is-selected': favoritesStore.activeFolderId.value === folder.id && favoritesStore.isFavoriteMode.value }"
-            @click="handleSelectFolder(folder.id)"
           >
+            <div
+              class="fav-menu-item"
+              :class="{ 'is-selected': favoritesStore.activeFolderId.value === folder.id && favoritesStore.isFavoriteMode.value }"
+              @click="handleSelectFolder(folder.id)"
+            >
             <div class="item-left">
               <span class="item-emoji">{{ folder.isDefault ? '📌' : '📁' }}</span>
               <span class="item-name">{{ formatFolderName(folder) }}</span>
@@ -183,8 +193,9 @@ onUnmounted(() => {
                 v-if="favoritesStore.getFolderCount(folder.id) > 0"
                 type="button"
                 class="btn-export-folder" 
-                @click.stop="handleExportFolder(folder)"
-                :title="locale === 'zh' ? '导出该收藏夹 PDF (试题卷与评分标准各1份)' : 'Export Questions & Mark Schemes to PDF'"
+                :class="{ 'btn-active': exportMenuFolderId === folder.id }"
+                @click.stop="toggleFolderExportMenu(folder.id)"
+                :title="locale === 'zh' ? '选择导出 PDF (试题 / 评分标准)' : 'Export Questions / Mark Scheme to PDF'"
               >
                 <svg class="export-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -201,6 +212,25 @@ onUnmounted(() => {
               </button>
             </div>
           </div>
+
+          <!-- Inline Export Options Row for this Folder -->
+          <transition name="fold-menu-fade">
+            <div v-if="exportMenuFolderId === folder.id" class="folder-export-panel" @click.stop>
+              <div class="fep-title">{{ locale === 'zh' ? '选择导出内容:' : 'Select PDF content:' }}</div>
+              <div class="fep-buttons">
+                <button type="button" class="fep-btn" @click.stop="handleExportFolder(folder, 'questions')">
+                  📄 {{ locale === 'zh' ? '试题卷' : 'Questions' }}
+                </button>
+                <button type="button" class="fep-btn" @click.stop="handleExportFolder(folder, 'ms')">
+                  ✨ {{ locale === 'zh' ? '评分标准' : 'Mark Scheme' }}
+                </button>
+                <button type="button" class="fep-btn fep-both" @click.stop="handleExportFolder(folder, 'both')">
+                  📦 {{ locale === 'zh' ? '两份均下载' : 'Both' }}
+                </button>
+              </div>
+            </div>
+          </transition>
+        </template>
         </div>
 
         <!-- Exit Favorites Mode button if currently active -->
@@ -443,10 +473,70 @@ onUnmounted(() => {
   transition: all 0.15s ease;
 }
 
-.btn-export-folder:hover {
+.btn-export-folder:hover,
+.btn-export-folder.btn-active {
   opacity: 1;
   color: var(--accent-primary);
   background: var(--accent-primary-light);
+}
+
+.folder-export-panel {
+  background: var(--bg-surface-subtle);
+  border: 1px dashed var(--accent-primary-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 3px 0 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fep-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.fep-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fep-btn {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: 0.72rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-main);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.14s ease;
+  text-align: center;
+}
+
+.fep-btn:hover {
+  background: var(--accent-primary-light);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.fep-btn.fep-both {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.fold-menu-fade-enter-active,
+.fold-menu-fade-leave-active {
+  transition: all 0.15s ease;
+}
+
+.fold-menu-fade-enter-from,
+.fold-menu-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-2px);
 }
 
 .export-svg-icon {

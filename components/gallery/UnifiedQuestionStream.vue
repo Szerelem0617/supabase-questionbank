@@ -174,14 +174,38 @@ watch(visibleItems, () => {
   }, 100)
 }, { flush: 'post' })
 
+const isExportMenuOpen = ref(false)
+
+function toggleExportMenu() {
+  if (props.isExportingPdf || props.filteredFavoriteItems.length === 0) return
+  isExportMenuOpen.value = !isExportMenuOpen.value
+}
+
+function handleSelectExport(type) {
+  isExportMenuOpen.value = false
+  emit('export-favorites-pdf', type)
+}
+
+function handleDocumentClick(e) {
+  if (isExportMenuOpen.value && !e.target.closest('.export-pdf-wrap')) {
+    isExportMenuOpen.value = false
+  }
+}
+
 onMounted(() => {
   setupSentinel()
   setupCardObserver()
+  if (typeof window !== 'undefined') {
+    document.addEventListener('click', handleDocumentClick)
+  }
 })
 
 onUnmounted(() => {
   if (sentinelObserver) sentinelObserver.disconnect()
   if (cardIntersectionObserver) cardIntersectionObserver.disconnect()
+  if (typeof window !== 'undefined') {
+    document.removeEventListener('click', handleDocumentClick)
+  }
 })
 
 // Scroll directly to a target card index
@@ -322,21 +346,71 @@ defineExpose({
         </div>
 
         <div class="fav-bar-actions">
-          <!-- 导出 PDF 按键 (无文本，仅图标，带 tooltip，在 x 按钮边上) -->
-          <button 
-            type="button" 
-            class="btn-export-pdf" 
-            :disabled="isExportingPdf || filteredFavoriteItems.length === 0"
-            @click="emit('export-favorites-pdf')"
-            :title="locale === 'zh' ? '导出 PDF (试题卷与评分标准各1份)' : 'Export Questions & Mark Schemes to PDF (2 files)'"
-          >
-            <span v-if="isExportingPdf" class="export-spinner">⏳</span>
-            <svg v-else class="export-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-          </button>
+          <!-- 导出 PDF 按键与下拉选择菜单 (无文本，仅图标，点击展开下载选项) -->
+          <div class="export-pdf-wrap">
+            <button 
+              type="button" 
+              class="btn-export-pdf" 
+              :class="{ 'btn-active': isExportMenuOpen }"
+              :disabled="isExportingPdf || filteredFavoriteItems.length === 0"
+              @click.stop="toggleExportMenu"
+              :title="locale === 'zh' ? '导出 PDF (试题卷 / 评分标准)' : 'Export PDF (Questions / Mark Scheme)'"
+            >
+              <span v-if="isExportingPdf" class="export-spinner">⏳</span>
+              <svg v-else class="export-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
+
+            <!-- 弹出选择菜单 -->
+            <transition name="popover-fade">
+              <div v-if="isExportMenuOpen" class="export-popover-menu" @click.stop>
+                <div class="export-popover-header">
+                  <span>{{ locale === 'zh' ? '选择导出内容' : 'Select PDF to Download' }}</span>
+                </div>
+                
+                <button 
+                  type="button" 
+                  class="export-menu-item" 
+                  @click="handleSelectExport('questions')"
+                >
+                  <span class="emi-icon">📄</span>
+                  <div class="emi-body">
+                    <span class="emi-title">{{ locale === 'zh' ? '下载试题卷' : 'Questions PDF' }}</span>
+                    <span class="emi-sub">{{ locale === 'zh' ? '真题高清排版 (单份文件)' : 'Questions only (1 file)' }}</span>
+                  </div>
+                </button>
+
+                <button 
+                  type="button" 
+                  class="export-menu-item" 
+                  @click="handleSelectExport('ms')"
+                >
+                  <span class="emi-icon">✨</span>
+                  <div class="emi-body">
+                    <span class="emi-title">{{ locale === 'zh' ? '下载评分标准' : 'Mark Scheme PDF' }}</span>
+                    <span class="emi-sub">{{ locale === 'zh' ? '参考答案与给分细则 (单份文件)' : 'Mark scheme only (1 file)' }}</span>
+                  </div>
+                </button>
+
+                <div class="export-menu-divider"></div>
+
+                <button 
+                  type="button" 
+                  class="export-menu-item emi-both" 
+                  @click="handleSelectExport('both')"
+                >
+                  <span class="emi-icon">📦</span>
+                  <div class="emi-body">
+                    <span class="emi-title">{{ locale === 'zh' ? '一并下载试卷与答案' : 'Download Both (2 Files)' }}</span>
+                    <span class="emi-sub">{{ locale === 'zh' ? '同时下载 2 份独立 PDF' : 'Download 2 separate PDFs' }}</span>
+                  </div>
+                </button>
+              </div>
+            </transition>
+          </div>
 
           <button @click="emit('exit-favorites')" class="btn-exit-mode" :title="t('flow.exitFavorites')">
             &times; {{ t('flow.exitFavorites') }}
@@ -727,6 +801,11 @@ defineExpose({
   flex-shrink: 0;
 }
 
+.export-pdf-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
 .btn-export-pdf {
   display: inline-flex;
   align-items: center;
@@ -742,7 +821,8 @@ defineExpose({
   transition: all 0.15s ease;
 }
 
-.btn-export-pdf:hover:not(:disabled) {
+.btn-export-pdf:hover:not(:disabled),
+.btn-export-pdf.btn-active {
   border-color: var(--accent-primary);
   color: var(--accent-primary);
   background: var(--accent-primary-light);
@@ -767,6 +847,102 @@ defineExpose({
 @keyframes pulse {
   from { opacity: 0.5; }
   to { opacity: 1; }
+}
+
+/* 导出 PDF 下拉弹窗 */
+.export-popover-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 230px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 6px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.export-popover-header {
+  padding: 6px 10px 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.export-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+}
+
+.export-menu-item:hover {
+  background: var(--bg-surface-subtle);
+  transform: translateX(2px);
+}
+
+.export-menu-item.emi-both:hover {
+  background: var(--accent-primary-light);
+}
+
+.emi-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.emi-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.emi-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.2;
+}
+
+.export-menu-item.emi-both .emi-title {
+  color: var(--accent-primary);
+}
+
+.emi-sub {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.export-menu-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 3px 6px;
+}
+
+.popover-fade-enter-active,
+.popover-fade-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.popover-fade-enter-from,
+.popover-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.97);
 }
 
 .btn-exit-mode {

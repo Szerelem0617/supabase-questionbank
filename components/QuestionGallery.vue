@@ -531,7 +531,7 @@ function onRemoveFavorite(item) {
   showToast(t('toast.unfavSuccess'))
 }
 
-function handleExportFavoritesPdf() {
+function handleExportFavoritesPdf(type = 'questions') {
   const activeF = favoritesStore.folders.value.find(f => f.id === favoritesStore.activeFolderId.value)
   const folderName = activeF?.isDefault ? t('galleryNav.defaultFolder') : (activeF?.name || t('galleryNav.defaultFolder'))
   const itemsToExport = filteredFavoriteItems.value.length > 0 ? filteredFavoriteItems.value : currentFolderAllItems.value
@@ -541,7 +541,8 @@ function handleExportFavoritesPdf() {
     cdnBase: cdnBase.value,
     r2DevUrl: r2DevUrl.value,
     showToast,
-    locale: locale.value
+    locale: locale.value,
+    type
   })
 }
 

@@ -2,6 +2,8 @@ import { ref } from 'vue'
 import { jsPDF } from 'jspdf'
 import type { FavoriteItem } from '~/composables/useFavorites'
 
+export type ExportPdfType = 'questions' | 'ms' | 'both'
+
 export function usePdfExport() {
   const isExporting = ref(false)
   const exportProgress = ref('')
@@ -77,7 +79,8 @@ export function usePdfExport() {
     cdnBase,
     r2DevUrl,
     showToast,
-    locale = 'zh'
+    locale = 'zh',
+    type = 'questions'
   }: {
     folderName: string
     items: FavoriteItem[]
@@ -85,6 +88,7 @@ export function usePdfExport() {
     r2DevUrl?: string
     showToast?: (msg: string) => void
     locale?: string
+    type?: ExportPdfType
   }): Promise<boolean> {
     if (!items || items.length === 0) {
       if (showToast) {
@@ -101,20 +105,25 @@ export function usePdfExport() {
       .replace(/[\\/:*?"<>|]/g, '_')
       .trim()
 
-    if (showToast) {
-      showToast(locale === 'zh'
-        ? `⏳ 正在导出「${safeFolderName}」PDF（试题与答案各1份，共 ${items.length} 题）...`
-        : `⏳ Generating PDFs for "${safeFolderName}" (${items.length} questions)...`
-      )
+    const needQuestions = type === 'questions' || type === 'both'
+    const needMs = type === 'ms' || type === 'both'
+
+    let startMsg = ''
+    if (type === 'questions') {
+      startMsg = locale === 'zh' ? `⏳ 正在生成「${safeFolderName}」试题卷 PDF（共 ${items.length} 题）...` : `⏳ Generating Questions PDF for "${safeFolderName}"...`
+    } else if (type === 'ms') {
+      startMsg = locale === 'zh' ? `⏳ 正在生成「${safeFolderName}」评分标准 PDF（共 ${items.length} 题）...` : `⏳ Generating Mark Scheme PDF for "${safeFolderName}"...`
+    } else {
+      startMsg = locale === 'zh' ? `⏳ 正在生成「${safeFolderName}」试卷与答案 2 份 PDF（共 ${items.length} 题）...` : `⏳ Generating 2 PDFs for "${safeFolderName}"...`
     }
+
+    if (showToast) showToast(startMsg)
 
     const createdUrls: string[] = []
 
     try {
-      // Document 1: Questions PDF
-      const docQ = new jsPDF({ format: 'a4', unit: 'mm', compress: true })
-      // Document 2: Mark Scheme PDF
-      const docMs = new jsPDF({ format: 'a4', unit: 'mm', compress: true })
+      const docQ = needQuestions ? new jsPDF({ format: 'a4', unit: 'mm', compress: true }) : null
+      const docMs = needMs ? new jsPDF({ format: 'a4', unit: 'mm', compress: true }) : null
 
       const pageWidth = 210
       const pageHeight = 297
@@ -140,212 +149,220 @@ export function usePdfExport() {
         exportProgress.value = `${Math.round(((i + 1) / items.length) * 100)}%`
 
         // ----------------------------------------------------
-        // 1. Process Question Item
+        // 1. Process Question Item (if requested)
         // ----------------------------------------------------
-        const qHeaderTitle = `${qIndexLabel}.  [${boardTag}] ${paperTag} ${subTag} ${scoreTag}`.trim()
-        
-        let qImageObj: { img: HTMLImageElement; url: string; width: number; height: number } | null = null
-        if (item.imagePath) {
-          try {
-            const blob = await fetchImageBlob(item.imagePath, cdnBase, r2DevUrl)
-            qImageObj = await loadImageElement(blob)
-            createdUrls.push(qImageObj.url)
-          } catch (e) {
-            console.warn(`Failed to load Q image for item ${i + 1}:`, e)
+        if (docQ) {
+          const qHeaderTitle = `${qIndexLabel}.  [${boardTag}] ${paperTag} ${subTag} ${scoreTag}`.trim()
+          
+          let qImageObj: { img: HTMLImageElement; url: string; width: number; height: number } | null = null
+          if (item.imagePath) {
+            try {
+              const blob = await fetchImageBlob(item.imagePath, cdnBase, r2DevUrl)
+              qImageObj = await loadImageElement(blob)
+              createdUrls.push(qImageObj.url)
+            } catch (e) {
+              console.warn(`Failed to load Q image for item ${i + 1}:`, e)
+            }
           }
-        }
 
-        // Calculate needed vertical space for Question item
-        let qRenderWidth = contentWidth
-        let qRenderHeight = 20
-        if (qImageObj) {
-          const aspect = qImageObj.height / qImageObj.width
-          qRenderHeight = Math.min(contentWidth * aspect, contentHeight - 15)
-          qRenderWidth = qRenderHeight / aspect
-        } else if (item.details) {
-          qRenderHeight = 30
-        }
-
-        const qTotalNeeded = 8 + qRenderHeight + 8 // Header + Image/Text + Gap
-
-        if (currentY_Q + qTotalNeeded > pageHeight - marginBottom) {
-          if (currentY_Q > marginTop + 5) {
-            docQ.addPage()
-            currentY_Q = marginTop
+          let qRenderWidth = contentWidth
+          let qRenderHeight = 20
+          if (qImageObj) {
+            const aspect = qImageObj.height / qImageObj.width
+            qRenderHeight = Math.min(contentWidth * aspect, contentHeight - 15)
+            qRenderWidth = qRenderHeight / aspect
+          } else if (item.details) {
+            qRenderHeight = 30
           }
-        }
 
-        // Draw Question Header Tag
-        docQ.setFont('helvetica', 'bold')
-        docQ.setFontSize(10)
-        docQ.setTextColor(194, 65, 40) // Accent primary color
-        docQ.text(qHeaderTitle, marginX, currentY_Q)
-        currentY_Q += 6
+          const qTotalNeeded = 8 + qRenderHeight + 8
 
-        // Draw Question Body (Image or text fallback)
-        if (qImageObj) {
-          const drawX = marginX + (contentWidth - qRenderWidth) / 2
-          docQ.addImage(qImageObj.img, 'PNG', drawX, currentY_Q, qRenderWidth, qRenderHeight, undefined, 'FAST')
-          currentY_Q += qRenderHeight + 6
-        } else if (item.details) {
-          docQ.setFont('helvetica', 'normal')
-          docQ.setFontSize(9)
-          docQ.setTextColor(40, 40, 40)
-          const lines = docQ.splitTextToSize(item.details, contentWidth)
-          docQ.text(lines, marginX, currentY_Q)
-          currentY_Q += lines.length * 4.5 + 6
-        } else {
-          docQ.setFont('helvetica', 'italic')
-          docQ.setFontSize(8)
-          docQ.setTextColor(140, 140, 140)
-          docQ.text('[Question diagram/details not provided]', marginX, currentY_Q)
-          currentY_Q += 8
-        }
+          if (currentY_Q + qTotalNeeded > pageHeight - marginBottom) {
+            if (currentY_Q > marginTop + 5) {
+              docQ.addPage()
+              currentY_Q = marginTop
+            }
+          }
 
-        // Draw subtle divider between items
-        if (i < items.length - 1 && currentY_Q < pageHeight - marginBottom - 15) {
-          docQ.setDrawColor(228, 228, 231)
-          docQ.setLineWidth(0.3)
-          docQ.line(marginX, currentY_Q, marginX + contentWidth, currentY_Q)
+          docQ.setFont('helvetica', 'bold')
+          docQ.setFontSize(10)
+          docQ.setTextColor(194, 65, 40)
+          docQ.text(qHeaderTitle, marginX, currentY_Q)
           currentY_Q += 6
-        }
 
-        // ----------------------------------------------------
-        // 2. Process Mark Scheme Item
-        // ----------------------------------------------------
-        const msHeaderTitle = `${qIndexLabel} Mark Scheme.  [${boardTag}] ${paperTag} ${subTag}`.trim()
+          if (qImageObj) {
+            const drawX = marginX + (contentWidth - qRenderWidth) / 2
+            docQ.addImage(qImageObj.img, 'PNG', drawX, currentY_Q, qRenderWidth, qRenderHeight, undefined, 'FAST')
+            currentY_Q += qRenderHeight + 6
+          } else if (item.details) {
+            docQ.setFont('helvetica', 'normal')
+            docQ.setFontSize(9)
+            docQ.setTextColor(40, 40, 40)
+            const lines = docQ.splitTextToSize(item.details, contentWidth)
+            docQ.text(lines, marginX, currentY_Q)
+            currentY_Q += lines.length * 4.5 + 6
+          } else {
+            docQ.setFont('helvetica', 'italic')
+            docQ.setFontSize(8)
+            docQ.setTextColor(140, 140, 140)
+            docQ.text('[Question diagram/details not provided]', marginX, currentY_Q)
+            currentY_Q += 8
+          }
 
-        let msImageObj: { img: HTMLImageElement; url: string; width: number; height: number } | null = null
-        if (item.msImagePath) {
-          try {
-            const blob = await fetchImageBlob(item.msImagePath, cdnBase, r2DevUrl)
-            msImageObj = await loadImageElement(blob)
-            createdUrls.push(msImageObj.url)
-          } catch (e) {
-            console.warn(`Failed to load MS image for item ${i + 1}:`, e)
+          if (i < items.length - 1 && currentY_Q < pageHeight - marginBottom - 15) {
+            docQ.setDrawColor(228, 228, 231)
+            docQ.setLineWidth(0.3)
+            docQ.line(marginX, currentY_Q, marginX + contentWidth, currentY_Q)
+            currentY_Q += 6
           }
         }
 
-        let msRenderWidth = contentWidth
-        let msRenderHeight = 20
-        if (msImageObj) {
-          const aspect = msImageObj.height / msImageObj.width
-          msRenderHeight = Math.min(contentWidth * aspect, contentHeight - 15)
-          msRenderWidth = msRenderHeight / aspect
-        } else if (item.msDetails) {
-          msRenderHeight = 25
-        }
+        // ----------------------------------------------------
+        // 2. Process Mark Scheme Item (if requested)
+        // ----------------------------------------------------
+        if (docMs) {
+          const msHeaderTitle = `${qIndexLabel} Mark Scheme.  [${boardTag}] ${paperTag} ${subTag}`.trim()
 
-        const msTotalNeeded = 8 + msRenderHeight + 8
-
-        if (currentY_Ms + msTotalNeeded > pageHeight - marginBottom) {
-          if (currentY_Ms > marginTop + 5) {
-            docMs.addPage()
-            currentY_Ms = marginTop
+          let msImageObj: { img: HTMLImageElement; url: string; width: number; height: number } | null = null
+          if (item.msImagePath) {
+            try {
+              const blob = await fetchImageBlob(item.msImagePath, cdnBase, r2DevUrl)
+              msImageObj = await loadImageElement(blob)
+              createdUrls.push(msImageObj.url)
+            } catch (e) {
+              console.warn(`Failed to load MS image for item ${i + 1}:`, e)
+            }
           }
-        }
 
-        // Draw MS Header Tag
-        docMs.setFont('helvetica', 'bold')
-        docMs.setFontSize(10)
-        docMs.setTextColor(43, 114, 186) // Slate blue accent
-        docMs.text(msHeaderTitle, marginX, currentY_Ms)
-        currentY_Ms += 6
+          let msRenderWidth = contentWidth
+          let msRenderHeight = 20
+          if (msImageObj) {
+            const aspect = msImageObj.height / msImageObj.width
+            msRenderHeight = Math.min(contentWidth * aspect, contentHeight - 15)
+            msRenderWidth = msRenderHeight / aspect
+          } else if (item.msDetails) {
+            msRenderHeight = 25
+          }
 
-        // Draw MS Body
-        if (msImageObj) {
-          const drawX = marginX + (contentWidth - msRenderWidth) / 2
-          docMs.addImage(msImageObj.img, 'PNG', drawX, currentY_Ms, msRenderWidth, msRenderHeight, undefined, 'FAST')
-          currentY_Ms += msRenderHeight + 6
-        } else if (item.msDetails) {
-          docMs.setFont('helvetica', 'normal')
-          docMs.setFontSize(9)
-          docMs.setTextColor(40, 40, 40)
-          const lines = docMs.splitTextToSize(item.msDetails, contentWidth)
-          docMs.text(lines, marginX, currentY_Ms)
-          currentY_Ms += lines.length * 4.5 + 6
-        } else {
-          docMs.setFont('helvetica', 'italic')
-          docMs.setFontSize(8)
-          docMs.setTextColor(140, 140, 140)
-          docMs.text('[Official mark scheme notes not provided]', marginX, currentY_Ms)
-          currentY_Ms += 8
-        }
+          const msTotalNeeded = 8 + msRenderHeight + 8
 
-        // Draw subtle divider between items
-        if (i < items.length - 1 && currentY_Ms < pageHeight - marginBottom - 15) {
-          docMs.setDrawColor(228, 228, 231)
-          docMs.setLineWidth(0.3)
-          docMs.line(marginX, currentY_Ms, marginX + contentWidth, currentY_Ms)
+          if (currentY_Ms + msTotalNeeded > pageHeight - marginBottom) {
+            if (currentY_Ms > marginTop + 5) {
+              docMs.addPage()
+              currentY_Ms = marginTop
+            }
+          }
+
+          docMs.setFont('helvetica', 'bold')
+          docMs.setFontSize(10)
+          docMs.setTextColor(43, 114, 186)
+          docMs.text(msHeaderTitle, marginX, currentY_Ms)
           currentY_Ms += 6
+
+          if (msImageObj) {
+            const drawX = marginX + (contentWidth - msRenderWidth) / 2
+            docMs.addImage(msImageObj.img, 'PNG', drawX, currentY_Ms, msRenderWidth, msRenderHeight, undefined, 'FAST')
+            currentY_Ms += msRenderHeight + 6
+          } else if (item.msDetails) {
+            docMs.setFont('helvetica', 'normal')
+            docMs.setFontSize(9)
+            docMs.setTextColor(40, 40, 40)
+            const lines = docMs.splitTextToSize(item.msDetails, contentWidth)
+            docMs.text(lines, marginX, currentY_Ms)
+            currentY_Ms += lines.length * 4.5 + 6
+          } else {
+            docMs.setFont('helvetica', 'italic')
+            docMs.setFontSize(8)
+            docMs.setTextColor(140, 140, 140)
+            docMs.text('[Official mark scheme notes not provided]', marginX, currentY_Ms)
+            currentY_Ms += 8
+          }
+
+          if (i < items.length - 1 && currentY_Ms < pageHeight - marginBottom - 15) {
+            docMs.setDrawColor(228, 228, 231)
+            docMs.setLineWidth(0.3)
+            docMs.line(marginX, currentY_Ms, marginX + contentWidth, currentY_Ms)
+            currentY_Ms += 6
+          }
         }
       }
 
       // ----------------------------------------------------
-      // 3. Add Running Headers & Footers to All Pages
+      // 3. Add Running Headers & Footers
       // ----------------------------------------------------
-      const totalPagesQ = docQ.getNumberOfPages()
-      for (let p = 1; p <= totalPagesQ; p++) {
-        docQ.setPage(p)
-        docQ.setFont('helvetica', 'normal')
-        docQ.setFontSize(8)
-        docQ.setTextColor(120, 120, 120)
+      if (docQ) {
+        const totalPagesQ = docQ.getNumberOfPages()
+        for (let p = 1; p <= totalPagesQ; p++) {
+          docQ.setPage(p)
+          docQ.setFont('helvetica', 'normal')
+          docQ.setFontSize(8)
+          docQ.setTextColor(120, 120, 120)
 
-        // Top Header
-        docQ.text(`Physics Past Paper Archive — ${safeFolderName} (Questions)`, marginX, 12)
-        docQ.text(`${todayStr}  •  Total ${items.length} Questions`, pageWidth - marginX, 12, { align: 'right' })
-        docQ.setDrawColor(220, 220, 220)
-        docQ.setLineWidth(0.2)
-        docQ.line(marginX, 14, pageWidth - marginX, 14)
+          docQ.text(`Physics Past Paper Archive — ${safeFolderName} (Questions)`, marginX, 12)
+          docQ.text(`${todayStr}  •  Total ${items.length} Questions`, pageWidth - marginX, 12, { align: 'right' })
+          docQ.setDrawColor(220, 220, 220)
+          docQ.setLineWidth(0.2)
+          docQ.line(marginX, 14, pageWidth - marginX, 14)
 
-        // Bottom Footer
-        docQ.line(marginX, pageHeight - 12, pageWidth - marginX, pageHeight - 12)
-        docQ.text(`Page ${p} of ${totalPagesQ}`, pageWidth / 2, pageHeight - 8, { align: 'center' })
-        docQ.text('https://physics.66367749.xyz', marginX, pageHeight - 8)
+          docQ.line(marginX, pageHeight - 12, pageWidth - marginX, pageHeight - 12)
+          docQ.text(`Page ${p} of ${totalPagesQ}`, pageWidth / 2, pageHeight - 8, { align: 'center' })
+          docQ.text('https://physics.66367749.xyz', marginX, pageHeight - 8)
+        }
       }
 
-      const totalPagesMs = docMs.getNumberOfPages()
-      for (let p = 1; p <= totalPagesMs; p++) {
-        docMs.setPage(p)
-        docMs.setFont('helvetica', 'normal')
-        docMs.setFontSize(8)
-        docMs.setTextColor(120, 120, 120)
+      if (docMs) {
+        const totalPagesMs = docMs.getNumberOfPages()
+        for (let p = 1; p <= totalPagesMs; p++) {
+          docMs.setPage(p)
+          docMs.setFont('helvetica', 'normal')
+          docMs.setFontSize(8)
+          docMs.setTextColor(120, 120, 120)
 
-        // Top Header
-        docMs.text(`Physics Past Paper Archive — ${safeFolderName} (Mark Scheme & Answers)`, marginX, 12)
-        docMs.text(`${todayStr}  •  Total ${items.length} Solutions`, pageWidth - marginX, 12, { align: 'right' })
-        docMs.setDrawColor(220, 220, 220)
-        docMs.setLineWidth(0.2)
-        docMs.line(marginX, 14, pageWidth - marginX, 14)
+          docMs.text(`Physics Past Paper Archive — ${safeFolderName} (Mark Scheme & Answers)`, marginX, 12)
+          docMs.text(`${todayStr}  •  Total ${items.length} Solutions`, pageWidth - marginX, 12, { align: 'right' })
+          docMs.setDrawColor(220, 220, 220)
+          docMs.setLineWidth(0.2)
+          docMs.line(marginX, 14, pageWidth - marginX, 14)
 
-        // Bottom Footer
-        docMs.line(marginX, pageHeight - 12, pageWidth - marginX, pageHeight - 12)
-        docMs.text(`Page ${p} of ${totalPagesMs}`, pageWidth / 2, pageHeight - 8, { align: 'center' })
-        docMs.text('https://physics.66367749.xyz', marginX, pageHeight - 8)
+          docMs.line(marginX, pageHeight - 12, pageWidth - marginX, pageHeight - 12)
+          docMs.text(`Page ${p} of ${totalPagesMs}`, pageWidth / 2, pageHeight - 8, { align: 'center' })
+          docMs.text('https://physics.66367749.xyz', marginX, pageHeight - 8)
+        }
       }
 
       // ----------------------------------------------------
-      // 4. Trigger Two Downloads
+      // 4. Trigger Downloads based on chosen type
       // ----------------------------------------------------
-      const qBlob = docQ.output('blob')
-      const msBlob = docMs.output('blob')
+      if (type === 'questions' && docQ) {
+        const qBlob = docQ.output('blob')
+        const qFilename = `${safeFolderName}_Questions_试题.pdf`
+        triggerDownload(qBlob, qFilename)
+        if (showToast) {
+          showToast(locale === 'zh' ? '✨ 试题卷 PDF 已开始下载！' : '✨ Questions PDF downloaded!')
+        }
+      } else if (type === 'ms' && docMs) {
+        const msBlob = docMs.output('blob')
+        const msFilename = `${safeFolderName}_MarkScheme_评分标准.pdf`
+        triggerDownload(msBlob, msFilename)
+        if (showToast) {
+          showToast(locale === 'zh' ? '✨ 评分标准 PDF 已开始下载！' : '✨ Mark Scheme PDF downloaded!')
+        }
+      } else if (type === 'both' && docQ && docMs) {
+        const qBlob = docQ.output('blob')
+        const msBlob = docMs.output('blob')
+        const qFilename = `${safeFolderName}_Questions_试题.pdf`
+        const msFilename = `${safeFolderName}_MarkScheme_评分标准.pdf`
 
-      const qFilename = `${safeFolderName}_Questions_试题.pdf`
-      const msFilename = `${safeFolderName}_MarkScheme_评分标准.pdf`
+        triggerDownload(qBlob, qFilename)
+        await new Promise(resolve => setTimeout(resolve, 600))
+        triggerDownload(msBlob, msFilename)
 
-      console.log('Starting triggerDownload 1:', qFilename)
-      triggerDownload(qBlob, qFilename)
-
-      // Delay so the browser initiates both downloads reliably
-      await new Promise(resolve => setTimeout(resolve, 800))
-      console.log('Starting triggerDownload 2:', msFilename)
-      triggerDownload(msBlob, msFilename)
-
-      if (showToast) {
-        showToast(locale === 'zh'
-          ? `✨ 导出完成！已开始下载试题卷与评分标准 2 份 PDF`
-          : `✨ Export complete! Downloaded 2 PDFs (Questions & Mark Scheme).`
-        )
+        if (showToast) {
+          showToast(locale === 'zh'
+            ? '✨ 已开始下载试题卷与评分标准 2 份 PDF'
+            : '✨ Downloaded 2 PDFs (Questions & Mark Scheme).'
+          )
+        }
       }
 
       return true
@@ -356,7 +373,6 @@ export function usePdfExport() {
       }
       return false
     } finally {
-      // Clean up object URLs
       createdUrls.forEach(url => URL.revokeObjectURL(url))
       isExporting.value = false
       exportProgress.value = ''
