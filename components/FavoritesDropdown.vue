@@ -189,45 +189,53 @@ onUnmounted(() => {
             </div>
             <div class="item-right">
               <span class="item-count">{{ favoritesStore.getFolderCount(folder.id) }} {{ locale === 'zh' ? '题' : '' }}</span>
-              <div class="row-export-wrap" v-if="favoritesStore.getFolderCount(folder.id) > 0">
-                <button 
-                  type="button"
-                  class="btn-export-folder" 
-                  :class="{ 'btn-active': exportMenuFolderId === folder.id }"
-                  @click.stop="toggleFolderExportMenu(folder.id)"
-                  :title="locale === 'zh' ? '导出 PDF' : 'Export PDF'"
-                >
-                  <svg class="export-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                </button>
-
-                <!-- Floating 2-choice Popover (Zero scrollbar!) -->
-                <transition name="popover-fade">
-                  <div v-if="exportMenuFolderId === folder.id" class="folder-export-popover" @click.stop>
-                    <button type="button" class="fep-opt-btn" @click.stop="handleExportFolder(folder, 'questions')">
-                      <span class="fep-opt-icon">📄</span>
-                      <span class="fep-opt-label">{{ locale === 'zh' ? '下载试题卷' : 'Questions PDF' }}</span>
-                    </button>
-                    <button type="button" class="fep-opt-btn" @click.stop="handleExportFolder(folder, 'ms')">
-                      <span class="fep-opt-icon">✨</span>
-                      <span class="fep-opt-label">{{ locale === 'zh' ? '下载评分标准' : 'Mark Scheme PDF' }}</span>
-                    </button>
-                  </div>
-                </transition>
-              </div>
+              <button 
+                v-if="favoritesStore.getFolderCount(folder.id) > 0"
+                type="button"
+                class="item-action-btn btn-export-folder" 
+                :class="{ 'btn-active': exportMenuFolderId === folder.id }"
+                @click.stop="toggleFolderExportMenu(folder.id)"
+                :title="locale === 'zh' ? '导出 PDF' : 'Export PDF'"
+              >
+                <svg class="action-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
 
               <button 
-                class="btn-del-folder" 
+                type="button"
+                class="item-action-btn btn-del-folder" 
                 @click.stop="handleFolderAction(folder)"
                 :title="folder.isDefault ? (locale === 'zh' ? '清空默认收藏夹' : 'Clear Default Folder') : (locale === 'zh' ? '删除此收藏夹' : 'Delete folder')"
               >
-                &times;
+                <svg class="action-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
               </button>
             </div>
           </div>
+
+          <!-- Inline Expand Export Options Row -->
+          <transition name="fold-panel-expand">
+            <div v-if="exportMenuFolderId === folder.id" class="folder-export-panel" @click.stop>
+              <div class="fep-header">
+                <span class="fep-title">{{ locale === 'zh' ? '选择导出内容' : 'Select PDF content' }}</span>
+              </div>
+              <div class="fep-buttons">
+                <button type="button" class="fep-btn" @click.stop="handleExportFolder(folder, 'questions')">
+                  <span class="fep-icon">📄</span>
+                  <span class="fep-label">{{ locale === 'zh' ? '试题卷' : 'Questions' }}</span>
+                </button>
+                <button type="button" class="fep-btn" @click.stop="handleExportFolder(folder, 'ms')">
+                  <span class="fep-icon">✨</span>
+                  <span class="fep-label">{{ locale === 'zh' ? '评分标准' : 'Mark Scheme' }}</span>
+                </button>
+              </div>
+            </div>
+          </transition>
         </template>
         </div>
 
@@ -316,14 +324,15 @@ onUnmounted(() => {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  width: 270px;
+  width: 275px;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 10px;
   box-shadow: 0 12px 32px rgba(44, 47, 50, 0.12), 0 2px 6px rgba(44, 47, 50, 0.04);
   padding: 8px;
   z-index: 1050;
-  overflow: visible;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .dropdown-fade-enter-active,
@@ -452,114 +461,152 @@ onUnmounted(() => {
 .item-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .item-count {
   font-size: 0.74rem;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-right: 2px;
 }
 
-.btn-export-folder {
-  background: none;
-  border: none;
-  color: var(--text-muted);
+.item-action-btn {
+  width: 22px;
+  height: 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 3px;
-  cursor: pointer;
-  border-radius: 4px;
-  opacity: 0.7;
-  transition: all 0.15s ease;
-}
-
-.btn-export-folder:hover,
-.btn-export-folder.btn-active {
-  opacity: 1;
-  color: var(--accent-primary);
-  background: var(--accent-primary-light);
-}
-
-.row-export-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.folder-export-popover {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  width: 140px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(44, 47, 50, 0.14), 0 2px 6px rgba(44, 47, 50, 0.06);
-  padding: 4px;
-  z-index: 1200;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.fep-opt-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border: none;
   background: transparent;
-  border-radius: 5px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-muted);
   cursor: pointer;
-  text-align: left;
-  width: 100%;
-  transition: all 0.14s ease;
-}
-
-.fep-opt-btn:hover {
-  background: var(--accent-primary-light);
-}
-
-.fep-opt-btn:hover .fep-opt-label {
-  color: var(--accent-primary);
-}
-
-.fep-opt-icon {
-  font-size: 0.95rem;
-  line-height: 1;
+  padding: 0;
+  margin: 0;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
   flex-shrink: 0;
 }
 
-.fep-opt-label {
+.item-action-btn:hover {
+  background: var(--bg-surface);
+  border-color: var(--border-color);
+  color: var(--text-main);
+  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.05);
+}
+
+.item-action-btn.btn-active {
+  background: var(--accent-primary-light);
+  border-color: var(--accent-primary-border);
+  color: var(--accent-primary);
+}
+
+.btn-del-folder:hover {
+  background: #fdf2f0;
+  border-color: rgba(194, 65, 40, 0.25);
+  color: var(--accent-primary);
+}
+
+.action-svg-icon {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+/* Inline Expand Options Panel */
+.folder-export-panel {
+  margin: 4px 0 6px;
+  padding: 8px 10px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+}
+
+.fep-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fep-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fep-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.fep-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.03);
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.fep-btn:hover {
+  background: var(--accent-primary-light);
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(194, 65, 40, 0.12);
+}
+
+.fep-icon {
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.fep-label {
   font-size: 0.74rem;
   font-weight: 600;
   color: var(--text-main);
   white-space: nowrap;
 }
 
-.export-svg-icon {
-  width: 13px;
-  height: 13px;
-}
-
-.btn-del-folder {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 1rem;
-  line-height: 1;
-  padding: 0 4px;
-  cursor: pointer;
-  border-radius: 3px;
-  opacity: 0.6;
-  transition: opacity 0.15s ease, color 0.15s ease;
-}
-
-.btn-del-folder:hover {
-  opacity: 1;
+.fep-btn:hover .fep-label {
   color: var(--accent-primary);
-  background: rgba(194, 65, 40, 0.08);
+}
+
+.fold-panel-expand-enter-active,
+.fold-panel-expand-leave-active {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.fold-panel-expand-enter-from,
+.fold-panel-expand-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.fold-panel-expand-enter-to,
+.fold-panel-expand-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 80px;
 }
 
 .fav-menu-footer {
