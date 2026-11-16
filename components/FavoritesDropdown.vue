@@ -154,7 +154,15 @@ onUnmounted(() => {
     <transition name="dropdown-fade">
       <div v-if="isFolderDropdownOpen" class="fav-dropdown-menu" @click.stop>
         <div class="fav-menu-header">
-          <span class="menu-title">{{ t('galleryNav.favorites') }}</span>
+          <div class="fmh-left">
+            <span class="menu-title">{{ t('galleryNav.favorites') }}</span>
+            <span v-if="user && favoritesStore.isCloudSyncing.value" class="cloud-sync-tag syncing" :title="locale === 'zh' ? '正在同步至云端' : 'Syncing to cloud'">
+              <span class="sync-dot"></span> {{ locale === 'zh' ? '同步中' : 'Syncing' }}
+            </span>
+            <span v-else-if="user" class="cloud-sync-tag synced" :title="locale === 'zh' ? '已安全同步至云端' : 'Synced with cloud'">
+              ☁️ {{ locale === 'zh' ? '云端已同步' : 'Synced' }}
+            </span>
+          </div>
           <button class="btn-create-f" @click="isCreatingFolder = !isCreatingFolder">
             + {{ t('toast.create') }}
           </button>
@@ -367,6 +375,49 @@ onUnmounted(() => {
   padding: 6px 8px 8px;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 6px;
+}
+
+.fmh-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cloud-sync-tag {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  letter-spacing: 0.02em;
+}
+
+.cloud-sync-tag.synced {
+  background: #f0f7f4;
+  color: #2b7a54;
+  border: 1px solid rgba(43, 122, 84, 0.2);
+}
+
+.cloud-sync-tag.syncing {
+  background: #fdf5e6;
+  color: #b37400;
+  border: 1px solid rgba(179, 116, 0, 0.2);
+}
+
+.sync-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #b37400;
+  display: inline-block;
+  animation: sync-pulse 1s infinite alternate;
+}
+
+@keyframes sync-pulse {
+  from { opacity: 0.3; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1.2); }
 }
 
 .menu-title {

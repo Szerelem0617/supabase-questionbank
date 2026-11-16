@@ -33,6 +33,8 @@ const activeFolderId = ref<string>('default')
 const isInitialized = ref(false)
 const isFavoriteMode = ref(false)
 const targetSubjectScope = ref<string>('')
+const isCloudSyncing = ref(false)
+let isWatcherAttached = false
 
 // Parse Exam Board from paper filename or series
 export function detectExamBoard(filename = '', series = ''): string {
@@ -122,6 +124,142 @@ export function useFavorites() {
     saveFolders()
     saveFavorites()
     isInitialized.value = true
+
+    // If user is already logged in at initialization, sync with cloud
+    if (user.value) {
+      syncWithCloud()
+    }
+  }
+
+  // Cloud Sync: Fetch from Supabase, merge local guest data, and write back
+  async function syncWithCloud() {
+    if (!user.value || typeof window === 'undefined') return
+    isCloudSyncing.value = true
+    try {
+      const { data, error } = await client
+        .from('user_favorites')
+        .select('folders, favorites, updated_at')
+        .eq('user_id', user.value.id)
+        .maybeSingle()
+
+      if (error && error.code !== 'PGRST116') {
+        console.warn('[Favorites] Cloud fetch error:', error)
+        return
+      }
+
+      if (!data) {
+        // First cloud record: push current local folders & favorites
+        await client.from('user_favorites').upsert({
+          user_id: user.value.id,
+          folders: folders.value,
+          favorites: favorites.value,
+          updated_at: new Date().toISOString()
+        })
+      } else {
+        // Cloud record exists: perform bidirectional merge with local guest items
+        const cloudFolders: FavoriteFolder[] = Array.isArray(data.folders) ? data.folders : []
+        const cloudFavorites: FavoriteItem[] = Array.isArray(data.favorites) ? data.favorites : []
+
+        // Merge folders: add any local folders that don't exist in cloud
+        const mergedFolders = [...cloudFolders]
+        folders.value.forEach(localF => {
+          if (!mergedFolders.some(cf => cf.id === localF.id || cf.name.toLowerCase() === localF.name.toLowerCase())) {
+            mergedFolders.push(localF)
+          }
+        })
+
+        if (!mergedFolders.some(f => f.id === 'default')) {
+          mergedFolders.unshift({
+            id: 'default',
+            name: '默认收藏夹',
+            isDefault: true,
+            createdAt: new Date().toISOString()
+          })
+        }
+
+        // Merge items: add local items if not already present in cloud
+        const mergedFavorites = [...cloudFavorites]
+        const cloudKeySet = new Set(cloudFavorites.map(f => `${f.questionId}_${f.subQId || ''}`))
+        let hasNewLocal = false
+
+        favorites.value.forEach(localItem => {
+          const key = `${localItem.questionId}_${localItem.subQId || ''}`
+          if (!cloudKeySet.has(key)) {
+            // Re-point folderId if folder was merged
+            const folderExists = mergedFolders.some(f => f.id === localItem.folderId)
+            if (!folderExists) {
+              localItem.folderId = 'default'
+            }
+            mergedFavorites.unshift(localItem)
+            cloudKeySet.add(key)
+            hasNewLocal = true
+          }
+        })
+
+        folders.value = mergedFolders
+        favorites.value = mergedFavorites
+        saveFolders()
+        saveFavorites()
+
+        // Push back if new items were merged from guest session
+        if (hasNewLocal || mergedFolders.length !== cloudFolders.length) {
+          await client.from('user_favorites').upsert({
+            user_id: user.value.id,
+            folders: mergedFolders,
+            favorites: mergedFavorites,
+            updated_at: new Date().toISOString()
+          })
+        }
+      }
+    } catch (e) {
+      console.error('[Favorites] Cloud sync failed:', e)
+    } finally {
+      isCloudSyncing.value = false
+    }
+  }
+
+  // Debounced push to cloud after local mutations (Optimistic UI)
+  let pushTimer: any = null
+  function pushToCloud() {
+    if (!user.value || typeof window === 'undefined') return
+    if (pushTimer) clearTimeout(pushTimer)
+    pushTimer = setTimeout(async () => {
+      try {
+        isCloudSyncing.value = true
+        await client.from('user_favorites').upsert({
+          user_id: user.value.id,
+          folders: folders.value,
+          favorites: favorites.value,
+          updated_at: new Date().toISOString()
+        })
+      } catch (err) {
+        console.error('[Favorites] Cloud push failed:', err)
+      } finally {
+        isCloudSyncing.value = false
+      }
+    }, 400)
+  }
+
+  // Setup single global user auth state listener
+  if (!isWatcherAttached && typeof window !== 'undefined') {
+    isWatcherAttached = true
+    watch(user, async (newUser, oldUser) => {
+      if (newUser && (!oldUser || newUser.id !== oldUser.id)) {
+        await syncWithCloud()
+      } else if (!newUser && oldUser) {
+        // Reset to empty default on sign out for privacy
+        folders.value = [{
+          id: 'default',
+          name: '默认收藏夹',
+          isDefault: true,
+          createdAt: new Date().toISOString()
+        }]
+        favorites.value = []
+        activeFolderId.value = 'default'
+        saveFolders()
+        saveFavorites()
+      }
+    }, { immediate: true })
   }
 
   // Persist folders
@@ -130,6 +268,7 @@ export function useFavorites() {
     try {
       localStorage.setItem('physics_user_folders', JSON.stringify(folders.value))
       localStorage.setItem('physics_active_folder_id', activeFolderId.value)
+      pushToCloud()
     } catch (e) {
       console.error('Failed to save folders to localStorage', e)
     }
@@ -140,6 +279,7 @@ export function useFavorites() {
     if (typeof window === 'undefined') return
     try {
       localStorage.setItem('physics_user_favorites', JSON.stringify(favorites.value))
+      pushToCloud()
     } catch (e) {
       console.error('Failed to save favorites to localStorage', e)
     }
@@ -364,7 +504,9 @@ export function useFavorites() {
     toggleFavorite,
     moveFavorite,
     removeFavoriteById,
-    getFolderCount
+    getFolderCount,
+    isCloudSyncing,
+    syncWithCloud
   }
 }
 
