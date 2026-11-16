@@ -4,6 +4,7 @@ import { useFavorites, getItemSubject } from '~/composables/useFavorites'
 import { useQuestionSearch } from '~/composables/useQuestionSearch'
 import { useDanmaku, MOCK_SUBQ_COMMENTS, checkIsLiked } from '~/composables/useDanmaku'
 import { useImageStitcher } from '~/composables/useImageStitcher'
+import { usePdfExport } from '~/composables/usePdfExport'
 import { getSubjectSeedQuestion } from '~/composables/useSeedQuestion'
 import { useSubjectPool } from '~/composables/useSubjectPool'
 
@@ -58,6 +59,7 @@ const poolStore = useSubjectPool(client)
 const searchStore = useQuestionSearch(client, showToast, () => props.subjectId)
 const danmakuStore = useDanmaku()
 const stitcherStore = useImageStitcher()
+const pdfStore = usePdfExport()
 
 // --- Core Gallery & Question State ---
 const loading = ref(true)
@@ -529,6 +531,20 @@ function onRemoveFavorite(item) {
   showToast(t('toast.unfavSuccess'))
 }
 
+function handleExportFavoritesPdf() {
+  const activeF = favoritesStore.folders.value.find(f => f.id === favoritesStore.activeFolderId.value)
+  const folderName = activeF?.isDefault ? t('galleryNav.defaultFolder') : (activeF?.name || t('galleryNav.defaultFolder'))
+  const itemsToExport = filteredFavoriteItems.value.length > 0 ? filteredFavoriteItems.value : currentFolderAllItems.value
+  pdfStore.exportFavoritesPdf({
+    folderName,
+    items: itemsToExport,
+    cdnBase: cdnBase.value,
+    r2DevUrl: r2DevUrl.value,
+    showToast,
+    locale: locale.value
+  })
+}
+
 function handleQuickMoveFolder(folderId) {
   if (!toastLastFavoritedItem.value) return
   const folder = favoritesStore.moveFavorite(toastLastFavoritedItem.value.id, folderId)
@@ -690,6 +706,7 @@ onUnmounted(() => {
         :hasMoreSearch="searchStore.hasMoreSearch.value"
         :isLoadingMore="searchStore.isLoadingMore.value"
         :isLoading="isStreamLoading"
+        :isExportingPdf="pdfStore.isExporting.value"
         :activeFolder="favoritesStore.activeFolder.value"
         :favFilterSubject="favFilterSubject"
         :favAvailableSubjects="favAvailableSubjects"
@@ -709,6 +726,7 @@ onUnmounted(() => {
         @load-more="handleStreamLoadMore"
         @exit-search="searchStore.exitSearchMode()"
         @exit-favorites="isFavoriteMode = false"
+        @export-favorites-pdf="handleExportFavoritesPdf"
         @select-folder="onSelectFolderFromDropdown"
         @create-folder="handleCreateFolder"
         @delete-folder="(id) => favoritesStore.deleteFolder(id)"

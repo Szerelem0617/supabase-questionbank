@@ -1,9 +1,14 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useFavorites } from '~/composables/useFavorites'
+import { usePdfExport } from '~/composables/usePdfExport'
 
 const { t, locale } = useI18n()
 const favoritesStore = useFavorites()
+const pdfStore = usePdfExport()
+const config = useRuntimeConfig()
+const cdnBase = computed(() => config.public.cdnBaseUrl || 'https://assets.66367749.xyz')
+const r2DevUrl = computed(() => config.public.r2DevUrl || 'https://pub-b20547c0488b456f8b6c033d9a7a1ca1.r2.dev')
 const router = useRouter()
 const route = useRoute()
 
@@ -36,6 +41,19 @@ function handleSelectFolder(folderId) {
 function handleExitFavoriteMode() {
   favoritesStore.isFavoriteMode.value = false
   isFolderDropdownOpen.value = false
+}
+
+function handleExportFolder(folder) {
+  const items = favoritesStore.favorites.value.filter(item => item.folderId === folder.id)
+  if (items.length === 0) return
+  const folderName = folder.isDefault ? t('galleryNav.defaultFolder') : folder.name
+  pdfStore.exportFavoritesPdf({
+    folderName,
+    items,
+    cdnBase: cdnBase.value,
+    r2DevUrl: r2DevUrl.value,
+    locale: locale.value
+  })
 }
 
 function handleCreateFolder() {
@@ -161,6 +179,19 @@ onUnmounted(() => {
             </div>
             <div class="item-right">
               <span class="item-count">{{ favoritesStore.getFolderCount(folder.id) }} {{ locale === 'zh' ? '题' : '' }}</span>
+              <button 
+                v-if="favoritesStore.getFolderCount(folder.id) > 0"
+                type="button"
+                class="btn-export-folder" 
+                @click.stop="handleExportFolder(folder)"
+                :title="locale === 'zh' ? '导出该收藏夹 PDF (试题卷与评分标准各1份)' : 'Export Questions & Mark Schemes to PDF'"
+              >
+                <svg class="export-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
               <button 
                 class="btn-del-folder" 
                 @click.stop="handleFolderAction(folder)"
@@ -396,6 +427,31 @@ onUnmounted(() => {
 .item-count {
   font-size: 0.74rem;
   color: var(--text-muted);
+}
+
+.btn-export-folder {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: all 0.15s ease;
+}
+
+.btn-export-folder:hover {
+  opacity: 1;
+  color: var(--accent-primary);
+  background: var(--accent-primary-light);
+}
+
+.export-svg-icon {
+  width: 13px;
+  height: 13px;
 }
 
 .btn-del-folder {

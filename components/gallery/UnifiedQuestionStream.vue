@@ -35,6 +35,7 @@ const props = defineProps({
   favAvailablePapers: { type: Array, default: () => [] },
   folders: { type: Array, default: () => [] },
   getFolderCount: { type: Function, default: () => 0 },
+  isExportingPdf: { type: Boolean, default: false },
   // General props & handlers
   isItemFav: { type: Function, required: true },
   isSubQFav: { type: Function, required: true },
@@ -55,6 +56,7 @@ const emit = defineEmits([
   'update:favFilterSubject',
   'exit-search',
   'exit-favorites',
+  'export-favorites-pdf',
   'select-folder',
   'create-folder',
   'delete-folder',
@@ -319,9 +321,27 @@ defineExpose({
           </div>
         </div>
 
-        <button @click="emit('exit-favorites')" class="btn-exit-mode" :title="t('flow.exitFavorites')">
-          &times; {{ t('flow.exitFavorites') }}
-        </button>
+        <div class="fav-bar-actions">
+          <!-- 导出 PDF 按键 (无文本，仅图标，带 tooltip，在 x 按钮边上) -->
+          <button 
+            type="button" 
+            class="btn-export-pdf" 
+            :disabled="isExportingPdf || filteredFavoriteItems.length === 0"
+            @click="emit('export-favorites-pdf')"
+            :title="locale === 'zh' ? '导出 PDF (试题卷与评分标准各1份)' : 'Export Questions & Mark Schemes to PDF (2 files)'"
+          >
+            <span v-if="isExportingPdf" class="export-spinner">⏳</span>
+            <svg v-else class="export-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+          </button>
+
+          <button @click="emit('exit-favorites')" class="btn-exit-mode" :title="t('flow.exitFavorites')">
+            &times; {{ t('flow.exitFavorites') }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -698,6 +718,55 @@ defineExpose({
 .current-badge-dot {
   color: var(--accent-primary);
   font-size: 0.65rem;
+}
+
+.fav-bar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-export-pdf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-export-pdf:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--accent-primary-light);
+  transform: translateY(-1px);
+}
+
+.btn-export-pdf:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.export-svg-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.export-spinner {
+  font-size: 0.85rem;
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
 }
 
 .btn-exit-mode {
