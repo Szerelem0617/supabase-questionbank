@@ -189,20 +189,36 @@ onUnmounted(() => {
             </div>
             <div class="item-right">
               <span class="item-count">{{ favoritesStore.getFolderCount(folder.id) }} {{ locale === 'zh' ? '题' : '' }}</span>
-              <button 
-                v-if="favoritesStore.getFolderCount(folder.id) > 0"
-                type="button"
-                class="btn-export-folder" 
-                :class="{ 'btn-active': exportMenuFolderId === folder.id }"
-                @click.stop="toggleFolderExportMenu(folder.id)"
-                :title="locale === 'zh' ? '选择导出 PDF (试题 / 评分标准)' : 'Export Questions / Mark Scheme to PDF'"
-              >
-                <svg class="export-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              </button>
+              <div class="row-export-wrap" v-if="favoritesStore.getFolderCount(folder.id) > 0">
+                <button 
+                  type="button"
+                  class="btn-export-folder" 
+                  :class="{ 'btn-active': exportMenuFolderId === folder.id }"
+                  @click.stop="toggleFolderExportMenu(folder.id)"
+                  :title="locale === 'zh' ? '导出 PDF' : 'Export PDF'"
+                >
+                  <svg class="export-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </button>
+
+                <!-- Floating 2-choice Popover (Zero scrollbar!) -->
+                <transition name="popover-fade">
+                  <div v-if="exportMenuFolderId === folder.id" class="folder-export-popover" @click.stop>
+                    <button type="button" class="fep-opt-btn" @click.stop="handleExportFolder(folder, 'questions')">
+                      <span class="fep-opt-icon">📄</span>
+                      <span class="fep-opt-label">{{ locale === 'zh' ? '下载试题卷' : 'Questions PDF' }}</span>
+                    </button>
+                    <button type="button" class="fep-opt-btn" @click.stop="handleExportFolder(folder, 'ms')">
+                      <span class="fep-opt-icon">✨</span>
+                      <span class="fep-opt-label">{{ locale === 'zh' ? '下载评分标准' : 'Mark Scheme PDF' }}</span>
+                    </button>
+                  </div>
+                </transition>
+              </div>
+
               <button 
                 class="btn-del-folder" 
                 @click.stop="handleFolderAction(folder)"
@@ -212,24 +228,6 @@ onUnmounted(() => {
               </button>
             </div>
           </div>
-
-          <!-- Inline Export Options Row for this Folder -->
-          <transition name="fold-menu-fade">
-            <div v-if="exportMenuFolderId === folder.id" class="folder-export-panel" @click.stop>
-              <div class="fep-title">{{ locale === 'zh' ? '选择导出内容:' : 'Select PDF content:' }}</div>
-              <div class="fep-buttons">
-                <button type="button" class="fep-btn" @click.stop="handleExportFolder(folder, 'questions')">
-                  📄 {{ locale === 'zh' ? '试题卷' : 'Questions' }}
-                </button>
-                <button type="button" class="fep-btn" @click.stop="handleExportFolder(folder, 'ms')">
-                  ✨ {{ locale === 'zh' ? '评分标准' : 'Mark Scheme' }}
-                </button>
-                <button type="button" class="fep-btn fep-both" @click.stop="handleExportFolder(folder, 'both')">
-                  📦 {{ locale === 'zh' ? '两份均下载' : 'Both' }}
-                </button>
-              </div>
-            </div>
-          </transition>
         </template>
         </div>
 
@@ -255,74 +253,77 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: var(--accent-primary-light);
-  color: var(--accent-primary);
-  border-radius: var(--radius-base);
-  border: 1px solid var(--accent-primary-border);
-  box-shadow: 0 1px 3px rgba(194, 65, 40, 0.1);
+  width: 34px;
+  height: 34px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.04);
   cursor: pointer;
   position: relative;
-  transition: all 0.18s ease;
+  transition: all 0.16s ease;
   padding: 0;
+  box-sizing: border-box;
 }
 
 .brand-fav-btn:hover {
-  background: #fbeee8;
+  background: var(--accent-primary-light);
   border-color: var(--accent-primary);
+  color: var(--accent-primary);
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(194, 65, 40, 0.18);
+  box-shadow: 0 2px 6px rgba(194, 65, 40, 0.12);
 }
 
 .brand-fav-btn.btn-active {
-  background: var(--accent-primary);
+  background: var(--accent-primary-light);
   border-color: var(--accent-primary);
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(194, 65, 40, 0.25);
+  color: var(--accent-primary);
+  box-shadow: 0 2px 6px rgba(194, 65, 40, 0.15);
 }
 
 .fav-icon {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   line-height: 1;
 }
 
 .fav-badge-count {
   position: absolute;
-  top: -5px;
-  right: -6px;
+  top: -3px;
+  right: -3px;
   background: var(--accent-primary);
   color: #ffffff;
-  font-size: 0.62rem;
-  font-weight: 800;
-  min-width: 17px;
-  height: 17px;
-  line-height: 17px;
-  border-radius: 9px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  min-width: 15px;
+  height: 15px;
+  line-height: 15px;
+  border-radius: 8px;
   text-align: center;
-  padding: 0 4px;
+  padding: 0 3px;
   box-sizing: border-box;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-  border: 1.5px solid #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  border: 1px solid #ffffff;
   font-variant-numeric: tabular-nums;
 }
 
 .brand-fav-btn.btn-active .fav-badge-count {
-  background: #2c2f32;
-  border-color: #f5f2eb;
+  background: var(--accent-primary);
+  border-color: #ffffff;
 }
 
 .fav-dropdown-menu {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  width: 250px;
+  width: 270px;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-card);
-  box-shadow: 0 10px 28px rgba(44, 47, 50, 0.12), 0 2px 6px rgba(44, 47, 50, 0.05);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(44, 47, 50, 0.12), 0 2px 6px rgba(44, 47, 50, 0.04);
   padding: 8px;
   z-index: 1050;
+  overflow: visible;
 }
 
 .dropdown-fade-enter-active,
@@ -480,63 +481,61 @@ onUnmounted(() => {
   background: var(--accent-primary-light);
 }
 
-.folder-export-panel {
-  background: var(--bg-surface-subtle);
-  border: 1px dashed var(--accent-primary-border);
-  border-radius: 6px;
-  padding: 6px 8px;
-  margin: 3px 0 6px;
+.row-export-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.folder-export-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  width: 140px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(44, 47, 50, 0.14), 0 2px 6px rgba(44, 47, 50, 0.06);
+  padding: 4px;
+  z-index: 1200;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
-.fep-title {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.fep-buttons {
+.fep-opt-btn {
   display: flex;
   align-items: center;
-  gap: 4px;
-}
-
-.fep-btn {
-  flex: 1;
-  padding: 4px 6px;
-  font-size: 0.72rem;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-  color: var(--text-main);
+  gap: 6px;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
   cursor: pointer;
-  white-space: nowrap;
+  text-align: left;
+  width: 100%;
   transition: all 0.14s ease;
-  text-align: center;
 }
 
-.fep-btn:hover {
+.fep-opt-btn:hover {
   background: var(--accent-primary-light);
-  border-color: var(--accent-primary);
+}
+
+.fep-opt-btn:hover .fep-opt-label {
   color: var(--accent-primary);
 }
 
-.fep-btn.fep-both {
-  color: var(--accent-primary);
+.fep-opt-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.fep-opt-label {
+  font-size: 0.74rem;
   font-weight: 600;
-}
-
-.fold-menu-fade-enter-active,
-.fold-menu-fade-leave-active {
-  transition: all 0.15s ease;
-}
-
-.fold-menu-fade-enter-from,
-.fold-menu-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-2px);
+  color: var(--text-main);
+  white-space: nowrap;
 }
 
 .export-svg-icon {

@@ -154,28 +154,29 @@ async function signOut() {
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .help-info-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-base);
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
   border: 1px solid var(--border-color);
   background: var(--bg-surface);
   color: var(--text-muted);
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all 0.16s ease;
   padding: 0;
-  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.04);
+  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.03);
+  box-sizing: border-box;
 }
 
 .help-info-btn:hover {
   background: var(--accent-primary-light);
-  border-color: var(--accent-primary-border);
+  border-color: var(--accent-primary);
   color: var(--accent-primary);
   transform: translateY(-1px);
 }
@@ -191,17 +192,19 @@ async function signOut() {
 .lang-switch-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  height: 34px;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  padding: 4px 10px;
-  border-radius: 20px;
+  padding: 0 11px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
-  box-shadow: var(--shadow-sm);
-  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.03);
+  transition: all 0.16s ease;
   user-select: none;
+  box-sizing: border-box;
 }
 
 .lang-switch-btn:hover {
@@ -235,74 +238,89 @@ async function signOut() {
 .auth-widget {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .user-info-link {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  text-decoration: none;
-  padding: 4px 10px 4px 6px;
-  border-radius: 20px;
+  height: 34px;
+  padding: 0 12px 0 5px;
+  border-radius: 8px;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  box-shadow: var(--shadow-sm);
-  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.03);
+  transition: all 0.16s ease;
+  text-decoration: none;
+  box-sizing: border-box;
 }
 
 .user-info-link:hover {
   background: var(--bg-surface-subtle);
-  border-color: var(--border-focus);
+  border-color: var(--accent-primary);
 }
 
 .nav-avatar {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   object-fit: cover;
 }
 
 .user-name {
   font-weight: 600;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   color: var(--text-main);
 }
 
 .btn-signout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
   border: 1px solid var(--border-color);
   background: var(--bg-surface);
   color: var(--text-muted);
-  padding: 6px 14px;
-  font-size: 0.84rem;
-  font-weight: 600;
-  border-radius: var(--radius-base);
+  padding: 0 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 8px;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.03);
+  transition: all 0.16s ease;
+  box-sizing: border-box;
 }
 
 .btn-signout:hover {
   background: var(--bg-surface-subtle);
   color: var(--text-main);
-  border-color: var(--border-focus);
+  border-color: var(--text-muted);
 }
 
 .btn-signin {
-  display: inline-block;
-  padding: 6px 18px;
-  font-size: 0.86rem;
-  font-weight: 700;
-  border-radius: var(--radius-base);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 8px;
   background: var(--accent-primary);
+  border: 1px solid var(--accent-primary);
   color: #ffffff !important;
   text-decoration: none;
-  transition: all 0.15s ease;
-  box-shadow: var(--shadow-sm);
+  transition: all 0.16s ease;
+  box-shadow: 0 1px 3px rgba(194, 65, 40, 0.15);
+  box-sizing: border-box;
 }
 
 .btn-signin:hover {
   background: var(--accent-primary-hover);
+  border-color: var(--accent-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(194, 65, 40, 0.22);
   color: #ffffff !important;
 }
 

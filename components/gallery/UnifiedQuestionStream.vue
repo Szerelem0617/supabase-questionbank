@@ -391,21 +391,7 @@ defineExpose({
                   <span class="emi-icon">✨</span>
                   <div class="emi-body">
                     <span class="emi-title">{{ locale === 'zh' ? '下载评分标准' : 'Mark Scheme PDF' }}</span>
-                    <span class="emi-sub">{{ locale === 'zh' ? '参考答案与给分细则 (单份文件)' : 'Mark scheme only (1 file)' }}</span>
-                  </div>
-                </button>
-
-                <div class="export-menu-divider"></div>
-
-                <button 
-                  type="button" 
-                  class="export-menu-item emi-both" 
-                  @click="handleSelectExport('both')"
-                >
-                  <span class="emi-icon">📦</span>
-                  <div class="emi-body">
-                    <span class="emi-title">{{ locale === 'zh' ? '一并下载试卷与答案' : 'Download Both (2 Files)' }}</span>
-                    <span class="emi-sub">{{ locale === 'zh' ? '同时下载 2 份独立 PDF' : 'Download 2 separate PDFs' }}</span>
+                    <span class="emi-sub">{{ locale === 'zh' ? '参考答案与给分细则' : 'Mark scheme only (1 file)' }}</span>
                   </div>
                 </button>
               </div>
