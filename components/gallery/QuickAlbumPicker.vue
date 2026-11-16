@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 
 const { t, locale } = useI18n()
+const user = useSupabaseUser()
 
 const props = defineProps({
   showToast: { type: Boolean, default: false },
@@ -58,6 +59,12 @@ function handleCreate() {
           <div class="quick-picker-header">
             <h4>{{ t('toast.selectAlbum') }}</h4>
             <button class="quick-picker-close" @click="showPicker = false">&times;</button>
+          </div>
+          <div v-if="!user" class="quick-guest-alert">
+            <span>⚠️ {{ locale === 'zh' ? '未登录状态下，数据仅保存在本地设备。' : 'Guest: data stored locally.' }}</span>
+            <NuxtLink to="/login" class="qga-link" @click="showPicker = false">
+              {{ locale === 'zh' ? '去登录' : 'Sign In' }} &rarr;
+            </NuxtLink>
           </div>
           <div class="quick-picker-list">
             <button 
@@ -172,6 +179,31 @@ function handleCreate() {
   font-size: 0.96rem;
   font-weight: 800;
   color: var(--text-main);
+}
+
+.quick-guest-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #fff8f5;
+  border: 1px solid rgba(194, 65, 40, 0.2);
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 0.72rem;
+  color: #7a3c30;
+}
+
+.qga-link {
+  color: var(--accent-primary);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.qga-link:hover {
+  text-decoration: underline;
 }
 
 .quick-picker-close {

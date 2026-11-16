@@ -4,6 +4,7 @@ import { useFavorites } from '~/composables/useFavorites'
 import { usePdfExport } from '~/composables/usePdfExport'
 
 const { t, locale } = useI18n()
+const user = useSupabaseUser()
 const favoritesStore = useFavorites()
 const pdfStore = usePdfExport()
 const config = useRuntimeConfig()
@@ -157,6 +158,19 @@ onUnmounted(() => {
           <button class="btn-create-f" @click="isCreatingFolder = !isCreatingFolder">
             + {{ t('toast.create') }}
           </button>
+        </div>
+
+        <!-- Guest Warning Notice Banner -->
+        <div v-if="!user" class="guest-warning-banner">
+          <div class="gwb-header">
+            <span class="gwb-badge">⚠️ {{ locale === 'zh' ? '未登录提醒' : 'Guest Notice' }}</span>
+            <NuxtLink to="/login" class="gwb-link-login" @click="isFolderDropdownOpen = false">
+              {{ locale === 'zh' ? '立即登录' : 'Sign In' }} &rarr;
+            </NuxtLink>
+          </div>
+          <p class="gwb-desc">
+            {{ locale === 'zh' ? '当前收藏仅暂存在本浏览器本地，清除缓存或更换设备将丢失数据，请及时登录账号永久保存！' : 'Favorites are only stored locally. Clear cache or switch devices will lose data. Please sign in to sync!' }}
+          </p>
         </div>
 
         <!-- Create new folder row -->
@@ -377,6 +391,55 @@ onUnmounted(() => {
 
 .btn-create-f:hover {
   background: var(--accent-primary-light);
+}
+
+/* Guest Mode Warning Banner */
+.guest-warning-banner {
+  background: #fff8f5;
+  border: 1px solid rgba(194, 65, 40, 0.22);
+  border-radius: 7px;
+  padding: 8px 10px;
+  margin: 2px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+}
+
+.gwb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gwb-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
+.gwb-link-login {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-decoration: none;
+  background: var(--accent-primary-light);
+  border: 1px solid var(--accent-primary-border);
+  padding: 1px 7px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.gwb-link-login:hover {
+  background: var(--accent-primary);
+  color: #ffffff;
+}
+
+.gwb-desc {
+  font-size: 0.69rem;
+  line-height: 1.38;
+  color: #7a3c30;
+  margin: 0;
 }
 
 .menu-new-folder-row {

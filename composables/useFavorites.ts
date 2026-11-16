@@ -292,11 +292,14 @@ export function useFavorites() {
 
       const folderObj = folders.value.find(f => f.id === chosenFolderId) || folders.value[0]
       const folderDisplayName = folderObj?.isDefault ? t('galleryNav.defaultFolder') : (folderObj?.name || t('galleryNav.defaultFolder'))
+      const guestWarning = !user.value 
+        ? (locale.value === 'zh' ? ' (未登录仅暂存本地，请及时登录)' : ' (Guest: local only, sign in to sync)') 
+        : ''
       return {
         action: 'added',
         item: newItem,
         folder: folderObj,
-        message: locale.value === 'zh' ? `已收藏到「${folderDisplayName}」` : `Saved to "${folderDisplayName}"`
+        message: (locale.value === 'zh' ? `已收藏到「${folderDisplayName}」` : `Saved to "${folderDisplayName}"`) + guestWarning
       }
     }
   }
