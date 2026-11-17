@@ -120,7 +120,7 @@ useSeoMeta({
 
 <style scoped>
 .home-container {
-  max-width: 1240px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 40px 24px 64px;
 }

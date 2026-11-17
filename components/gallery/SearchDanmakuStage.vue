@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useDanmaku, DEFAULT_COMMUNITY_COMMENTS, CURATED_PHYSICS_TIPS } from '~/composables/useDanmaku'
+import { useDanmaku, CURATED_PHYSICS_TIPS } from '~/composables/useDanmaku'
 
 const { locale } = useI18n()
 const danmakuStore = useDanmaku()
@@ -31,7 +31,6 @@ function distributeSearchComments() {
   const all = searchComments.value
   if (!all || all.length === 0) return
 
-  // 4 buckets: left-0, left-1, right-0, right-1
   const l0 = []
   const l1 = []
   const r0 = []
@@ -80,19 +79,34 @@ function onIteration(laneGroup, laneIdx) {
           <div 
             v-for="(item, idx) in [...leftLanes[0], ...leftLanes[0]]" 
             :key="'sl0-' + idx + '-' + item.id"
-            class="search-capsule"
+            class="danmaku-capsule"
           >
-            <span class="sc-tag">💡 {{ item.author }}</span>
-            <span class="sc-msg" :title="item.message">{{ item.message }}</span>
-            <button 
-              type="button" 
-              class="sc-like-btn" 
-              :class="{ 'is-liked': item.liked }"
-              @click.stop="handleLike(item)"
-              :title="item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
-            >
-              {{ item.liked ? '❤️' : '🤍' }} {{ item.likes || 0 }}
-            </button>
+            <div class="danmaku-text-preview">
+              <span class="preview-dot"></span>
+              {{ item.message }}
+            </div>
+
+            <div class="danmaku-hover-card" @click.stop>
+              <div class="hover-card-header">
+                <span class="hover-tag">💡 {{ item.author }}</span>
+                <span class="hover-time">{{ item.time || '刚刚' }}</span>
+              </div>
+              <div class="hover-card-content">
+                {{ item.message }}
+              </div>
+              <div class="hover-card-footer">
+                <button 
+                  type="button" 
+                  class="hover-like-btn" 
+                  :class="{ 'is-liked': item.liked }"
+                  @click.stop="handleLike(item)"
+                  :title="item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
+                >
+                  <span class="like-heart">{{ item.liked ? '❤️' : '🤍' }}</span>
+                  <span class="like-num">{{ item.likes || 0 }}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -103,19 +117,34 @@ function onIteration(laneGroup, laneIdx) {
           <div 
             v-for="(item, idx) in [...leftLanes[1], ...leftLanes[1]]" 
             :key="'sl1-' + idx + '-' + item.id"
-            class="search-capsule"
+            class="danmaku-capsule"
           >
-            <span class="sc-tag">💬 {{ item.author }}</span>
-            <span class="sc-msg" :title="item.message">{{ item.message }}</span>
-            <button 
-              type="button" 
-              class="sc-like-btn" 
-              :class="{ 'is-liked': item.liked }"
-              @click.stop="handleLike(item)"
-              :title="item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
-            >
-              {{ item.liked ? '❤️' : '🤍' }} {{ item.likes || 0 }}
-            </button>
+            <div class="danmaku-text-preview">
+              <span class="preview-dot"></span>
+              {{ item.message }}
+            </div>
+
+            <div class="danmaku-hover-card" @click.stop>
+              <div class="hover-card-header">
+                <span class="hover-tag">💬 {{ item.author }}</span>
+                <span class="hover-time">{{ item.time || '刚刚' }}</span>
+              </div>
+              <div class="hover-card-content">
+                {{ item.message }}
+              </div>
+              <div class="hover-card-footer">
+                <button 
+                  type="button" 
+                  class="hover-like-btn" 
+                  :class="{ 'is-liked': item.liked }"
+                  @click.stop="handleLike(item)"
+                  :title="item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
+                >
+                  <span class="like-heart">{{ item.liked ? '❤️' : '🤍' }}</span>
+                  <span class="like-num">{{ item.likes || 0 }}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -129,19 +158,34 @@ function onIteration(laneGroup, laneIdx) {
           <div 
             v-for="(item, idx) in [...rightLanes[0], ...rightLanes[0]]" 
             :key="'sr0-' + idx + '-' + item.id"
-            class="search-capsule"
+            class="danmaku-capsule"
           >
-            <span class="sc-tag">⚡ {{ item.author }}</span>
-            <span class="sc-msg" :title="item.message">{{ item.message }}</span>
-            <button 
-              type="button" 
-              class="sc-like-btn" 
-              :class="{ 'is-liked': item.liked }"
-              @click.stop="handleLike(item)"
-              :title="item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
-            >
-              {{ item.liked ? '❤️' : '🤍' }} {{ item.likes || 0 }}
-            </button>
+            <div class="danmaku-text-preview">
+              <span class="preview-dot"></span>
+              {{ item.message }}
+            </div>
+
+            <div class="danmaku-hover-card" @click.stop>
+              <div class="hover-card-header">
+                <span class="hover-tag">⚡ {{ item.author }}</span>
+                <span class="hover-time">{{ item.time || '刚刚' }}</span>
+              </div>
+              <div class="hover-card-content">
+                {{ item.message }}
+              </div>
+              <div class="hover-card-footer">
+                <button 
+                  type="button" 
+                  class="hover-like-btn" 
+                  :class="{ 'is-liked': item.liked }"
+                  @click.stop="handleLike(item)"
+                  :title="item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
+                >
+                  <span class="like-heart">{{ item.liked ? '❤️' : '🤍' }}</span>
+                  <span class="like-num">{{ item.likes || 0 }}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -152,19 +196,34 @@ function onIteration(laneGroup, laneIdx) {
           <div 
             v-for="(item, idx) in [...rightLanes[1], ...rightLanes[1]]" 
             :key="'sr1-' + idx + '-' + item.id"
-            class="search-capsule"
+            class="danmaku-capsule"
           >
-            <span class="sc-tag">✨ {{ item.author }}</span>
-            <span class="sc-msg" :title="item.message">{{ item.message }}</span>
-            <button 
-              type="button" 
-              class="sc-like-btn" 
-              :class="{ 'is-liked': item.liked }"
-              @click.stop="handleLike(item)"
-              :title="item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
-            >
-              {{ item.liked ? '❤️' : '🤍' }} {{ item.likes || 0 }}
-            </button>
+            <div class="danmaku-text-preview">
+              <span class="preview-dot"></span>
+              {{ item.message }}
+            </div>
+
+            <div class="danmaku-hover-card" @click.stop>
+              <div class="hover-card-header">
+                <span class="hover-tag">✨ {{ item.author }}</span>
+                <span class="hover-time">{{ item.time || '刚刚' }}</span>
+              </div>
+              <div class="hover-card-content">
+                {{ item.message }}
+              </div>
+              <div class="hover-card-footer">
+                <button 
+                  type="button" 
+                  class="hover-like-btn" 
+                  :class="{ 'is-liked': item.liked }"
+                  @click.stop="handleLike(item)"
+                  :title="item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
+                >
+                  <span class="like-heart">{{ item.liked ? '❤️' : '🤍' }}</span>
+                  <span class="like-num">{{ item.likes || 0 }}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -188,7 +247,7 @@ function onIteration(laneGroup, laneIdx) {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 280px;
+  width: 290px;
   overflow: hidden;
   pointer-events: none;
 }
@@ -223,7 +282,7 @@ function onIteration(laneGroup, laneIdx) {
 
 .search-track {
   display: inline-flex;
-  gap: 18px;
+  gap: 22px;
   white-space: nowrap;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
@@ -256,72 +315,135 @@ function onIteration(laneGroup, laneIdx) {
   100% { transform: translateX(-50%); }
 }
 
-.search-capsule {
+/* Isomorphic capsule structure matching DanmakuStage.vue */
+.danmaku-capsule {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.danmaku-text-preview {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
-  padding: 0 10px 0 8px;
+  padding: 4px 13px 4px 10px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #3d3b38;
   background: rgba(253, 250, 246, 0.94);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(223, 219, 212, 0.85);
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(44, 47, 50, 0.05);
-  pointer-events: auto;
-  cursor: default;
+  border: 1px solid rgba(220, 215, 206, 0.9);
+  box-shadow: 0 2px 6px rgba(44, 47, 50, 0.05);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: all 0.16s ease;
   user-select: none;
 }
 
-.search-capsule:hover {
-  transform: translateY(-1px) scale(1.02);
-  border-color: var(--accent-primary);
-  box-shadow: 0 4px 12px rgba(194, 65, 40, 0.14);
+.preview-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  flex-shrink: 0;
+  opacity: 0.8;
 }
 
-.sc-tag {
-  font-size: 0.68rem;
+.danmaku-capsule:hover .danmaku-text-preview {
+  background: #ffffff;
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: 0 4px 12px rgba(194, 65, 40, 0.16);
+  transform: translateY(-1px);
+}
+
+/* Hover Card Popover */
+.danmaku-hover-card {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 230px;
+  max-width: 270px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(44, 47, 50, 0.12);
+  padding: 10px 12px;
+  z-index: 100;
+  white-space: normal;
+  pointer-events: auto;
+  cursor: default;
+}
+
+.danmaku-capsule:hover .danmaku-hover-card {
+  display: block;
+}
+
+.hover-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.hover-tag {
+  font-size: 0.7rem;
   font-weight: 700;
   color: var(--accent-primary);
   background: var(--accent-primary-light);
   padding: 1px 6px;
-  border-radius: 8px;
-  white-space: nowrap;
+  border-radius: 6px;
 }
 
-.sc-msg {
+.hover-time {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.hover-card-content {
   font-size: 0.78rem;
-  font-weight: 500;
   color: var(--text-main);
-  max-width: 170px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
+  margin-bottom: 8px;
 }
 
-.sc-like-btn {
-  background: transparent;
-  border: none;
+.hover-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.hover-like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
   font-size: 0.72rem;
   color: var(--text-muted);
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 1px 4px;
-  border-radius: 8px;
-  transition: all 0.14s ease;
+  transition: all 0.15s ease;
 }
 
-.sc-like-btn:hover {
-  background: rgba(194, 65, 40, 0.08);
+.hover-like-btn:hover {
+  background: var(--accent-primary-light);
   color: var(--accent-primary);
+  border-color: var(--accent-primary-border);
 }
 
-.sc-like-btn.is-liked {
+.hover-like-btn.is-liked {
   color: #e0245e;
   font-weight: 700;
+  border-color: rgba(224, 36, 94, 0.3);
 }
 
 @media (max-width: 1280px) {
