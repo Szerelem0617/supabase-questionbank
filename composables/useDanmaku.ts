@@ -96,6 +96,11 @@ export function useDanmaku() {
   }
 
   function onSlotIteration(sIdx: number, list: any[]) {
+    // 弹幕完成一轮动画循环飘走后，固化为公共总赞数，重置临时高亮，实现双向匿名
+    if (activeSlots.value[sIdx]?.item) {
+      activeSlots.value[sIdx].item.liked = false
+    }
+
     if (!list || list.length <= MAX_DANMAKU_DISPLAY) {
       return
     }
@@ -105,28 +110,48 @@ export function useDanmaku() {
     }
   }
 
+  // 跨端双向匿名点赞：飘走前可撤回反悔，飘走后固化
+  async function syncLikeDelta(commentId: string | number, delta: number, client: any) {
+    if (!commentId || !client) return
+    if (String(commentId).startsWith('mock-') || String(commentId).startsWith('hc-') || String(commentId).startsWith('local-')) {
+      return
+    }
+    const numericId = Number(commentId)
+    if (isNaN(numericId)) return
+
+    try {
+      // 优先调用 Supabase 原子函数（安全无竞争、免RLS权限障碍）
+      const { error: rpcErr } = await client.rpc('increment_comment_like', {
+        c_id: numericId,
+        delta: delta
+      })
+
+      if (rpcErr) {
+        // 容错回退机制：若数据库未执行函数脚本，直接单行更新
+        const { data } = await client.from('comments').select('likes').eq('id', numericId).single()
+        const current = data?.likes || 0
+        await client.from('comments').update({
+          likes: Math.max(0, current + delta)
+        }).eq('id', numericId)
+      }
+    } catch (err) {
+      console.warn('[Danmaku] Failed to sync like delta:', err)
+    }
+  }
+
   async function toggleLike(item: any, client: any, showToast?: (msg: string) => void) {
     if (!item) return
+    // 飘走前可反悔取消
     if (item.liked) {
       item.likes = Math.max(0, (item.likes || 1) - 1)
       item.liked = false
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(`danmaku_like_${item.id}`)
-      }
+      if (showToast) showToast(locale.value === 'zh' ? '已取消点赞' : 'Like removed')
+      syncLikeDelta(item.id, -1, client)
     } else {
       item.likes = (item.likes || 0) + 1
       item.liked = true
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`danmaku_like_${item.id}`, 'true')
-      }
-      if (showToast) showToast(locale.value === 'zh' ? '👍 感谢赞同该做题思路！' : '👍 Liked comment!')
-      if (!item.isMock && typeof item.id === 'number' && client) {
-        try {
-          await client.from('comments').update({ likes: item.likes }).eq('id', item.id)
-        } catch (e) {
-          console.warn('Sync likes to Supabase failed:', e)
-        }
-      }
+      if (showToast) showToast(locale.value === 'zh' ? '❤️ 感谢点赞该做题心得！' : '❤️ Liked note!')
+      syncLikeDelta(item.id, 1, client)
     }
   }
 

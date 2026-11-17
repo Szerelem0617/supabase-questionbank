@@ -91,6 +91,14 @@ function handleLike(item) {
   danmakuStore.toggleLike(item, client)
 }
 
+function onTrackLoop(laneIdx) {
+  // 弹幕离开本轮视野飘走后，重置临时选中高亮态，双向匿名
+  const targetLane = laneIdx === 0 ? lane0Items.value : lane1Items.value
+  targetLane.forEach(item => {
+    item.liked = false
+  })
+}
+
 onMounted(() => {
   distributeToLanes()
   fetchHomepageComments()
@@ -101,10 +109,10 @@ onMounted(() => {
   <div v-if="danmakuStore.danmakuEnabled.value" class="home-danmaku-stage">
     <!-- Lane 1 (Fly left-to-right or right-to-left) -->
     <div class="h-lane lane-top">
-      <div class="h-lane-track track-speed-normal">
+      <div class="h-lane-track track-speed-normal" @animationiteration="onTrackLoop(0)">
         <div 
-          v-for="item in [...lane0Items, ...lane0Items]" 
-          :key="'l0-' + item.id + '-' + Math.random()" 
+          v-for="(item, idx) in [...lane0Items, ...lane0Items]" 
+          :key="'l0-' + idx + '-' + item.id" 
           class="h-capsule"
         >
           <span class="hc-tag">💬 {{ item.author }}</span>
@@ -114,7 +122,7 @@ onMounted(() => {
             class="hc-like-btn" 
             :class="{ 'is-liked': item.liked }" 
             @click.stop="handleLike(item)"
-            :title="item.liked ? '已赞同' : '点赞赞同'"
+            :title="item.liked ? '已点赞 (飘走前可点击取消)' : '点赞赞同'"
           >
             {{ item.liked ? '❤️' : '🤍' }} {{ item.likes || 0 }}
           </button>
@@ -124,10 +132,10 @@ onMounted(() => {
 
     <!-- Lane 2 -->
     <div class="h-lane lane-bottom">
-      <div class="h-lane-track track-speed-slower">
+      <div class="h-lane-track track-speed-slower" @animationiteration="onTrackLoop(1)">
         <div 
-          v-for="item in [...lane1Items, ...lane1Items]" 
-          :key="'l1-' + item.id + '-' + Math.random()" 
+          v-for="(item, idx) in [...lane1Items, ...lane1Items]" 
+          :key="'l1-' + idx + '-' + item.id" 
           class="h-capsule"
         >
           <span class="hc-tag">💡 {{ item.author }}</span>
@@ -137,7 +145,7 @@ onMounted(() => {
             class="hc-like-btn" 
             :class="{ 'is-liked': item.liked }" 
             @click.stop="handleLike(item)"
-            :title="item.liked ? '已赞同' : '点赞赞同'"
+            :title="item.liked ? '已点赞 (飘走前可点击取消)' : '点赞赞同'"
           >
             {{ item.liked ? '❤️' : '🤍' }} {{ item.likes || 0 }}
           </button>
