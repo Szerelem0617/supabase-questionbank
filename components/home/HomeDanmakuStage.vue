@@ -10,39 +10,62 @@ const props = defineProps({
   showToast: { type: Function, default: null }
 })
 
-// Unified pool of comments
-const allComments = computed(() => {
+// Unified pool of comments (community + high frequency curated tips)
+const commentsPool = computed(() => {
   const globalList = danmakuStore.globalCommentsList.value || []
-  return [...globalList, ...CURATED_PHYSICS_TIPS.map((t, idx) => ({
-    id: `seed-home-${idx}`,
-    author: t.author,
-    message: t.message,
-    likes: t.likes,
-    time: t.time,
+  return [...globalList, ...CURATED_PHYSICS_TIPS.map((tip, idx) => ({
+    id: `home-seed-${idx}`,
+    author: tip.author,
+    message: tip.message,
+    likes: tip.likes,
+    time: tip.time,
     liked: false
   }))]
 })
 
-// 5 evenly distributed vertical lanes (independent of exam board headers)
-const laneTops = [50, 180, 310, 440, 570]
+// Staggered, irregular vertical lane tops (isomorphic with subject page)
+const laneTops = [40, 140, 245, 360, 485, 615, 750]
+const MAX_SLOTS = 7
+const CYCLE_DURATION = 15
 
-// Each lane maintains an array of items for continuous looping
-const laneItems = ref([[], [], [], [], []])
+const activeSlots = ref([])
+const poolPointer = ref(0)
 
-function distributeComments() {
-  const list = allComments.value
+function initSlots() {
+  const list = commentsPool.value
   if (!list || list.length === 0) return
 
-  const lanes = [[], [], [], [], []]
-  list.forEach((item, idx) => {
-    lanes[idx % 5].push(item)
-  })
+  const count = Math.min(MAX_SLOTS, list.length)
+  const slots = []
+  for (let i = 0; i < count; i++) {
+    // Irregular staggered negative delays and varied durations so they don't form a line
+    const variedDuration = CYCLE_DURATION + (i % 3) * 2.5
+    const negativeDelay = -Number((i * (variedDuration / count) + (i % 2) * 1.5).toFixed(2))
+    slots.push({
+      slotId: `hslot-${i}-${Date.now()}`,
+      laneIndex: i,
+      item: list[i % list.length],
+      duration: variedDuration,
+      delay: negativeDelay,
+      isPaused: false
+    })
+  }
+  poolPointer.value = count - 1
+  activeSlots.value = slots
+}
 
-  // Ensure each lane has at least 3 items for infinite marquee
-  laneItems.value = lanes.map((arr, i) => {
-    if (arr.length < 3) return [...arr, ...arr, ...arr]
-    return arr
-  })
+function onSlotIteration(sIdx) {
+  const list = commentsPool.value
+  if (!list || list.length <= MAX_SLOTS) return
+
+  if (activeSlots.value[sIdx]?.item) {
+    activeSlots.value[sIdx].item.liked = false
+  }
+
+  poolPointer.value = (poolPointer.value + 1) % list.length
+  if (activeSlots.value[sIdx]) {
+    activeSlots.value[sIdx].item = list[poolPointer.value]
+  }
 }
 
 // Fetch real comments from Supabase
@@ -64,7 +87,6 @@ async function fetchHomepageComments() {
         time: formatTimeAgo(c.created_at)
       }))
 
-      // Prepend to store's global comments
       dbComments.forEach(c => {
         if (!danmakuStore.globalCommentsList.value.some(existing => existing.id === c.id)) {
           danmakuStore.globalCommentsList.value.unshift(c)
@@ -74,7 +96,9 @@ async function fetchHomepageComments() {
   } catch (err) {
     console.warn('[HomeDanmaku] Failed to fetch comments:', err)
   } finally {
-    distributeComments()
+    if (activeSlots.value.length === 0) {
+      initSlots()
+    }
   }
 }
 
@@ -90,8 +114,9 @@ function formatTimeAgo(dateStr) {
 }
 
 watch(danmakuStore.latestGlobalComment, (newMsg) => {
-  if (newMsg) {
-    distributeComments()
+  if (newMsg && activeSlots.value.length > 0) {
+    // Instantly inject newly posted comment into the first slot
+    activeSlots.value[0].item = newMsg
   }
 })
 
@@ -99,65 +124,115 @@ function handleLike(item) {
   danmakuStore.toggleLike(item, client, props.showToast)
 }
 
-function onIteration(laneIdx) {
-  const lane = laneItems.value[laneIdx]
-  if (lane) {
-    lane.forEach(item => { item.liked = false })
-  }
-}
-
 onMounted(() => {
-  distributeComments()
+  initSlots()
   fetchHomepageComments()
 })
 </script>
 
 <template>
-  <div v-if="danmakuStore.danmakuEnabled.value" class="home-ambient-stage" aria-hidden="true">
-    <!-- 5 Independent Vertical Lanes spanning from Left Gutter across Cards to Right Gutter -->
-    <div 
-      v-for="(lane, lIdx) in laneItems" 
-      :key="'lane-' + lIdx"
-      class="danmaku-lane-row"
-      :style="{ top: `${laneTops[lIdx % laneTops.length]}px` }"
-    >
-      <!-- Alternating directions: even lanes fly Right-to-Left, odd lanes fly Left-to-Right -->
+  <div v-if="danmakuStore.danmakuEnabled.value && activeSlots.length > 0" class="home-portal-wrapper" aria-hidden="true">
+    <!-- 左侧留白舞台：从卡片左边缘穿出，向左外侧滑行 (完全同构于 subject 页面) -->
+    <div class="danmaku-portal-stage danmaku-stage-left">
       <div 
-        class="danmaku-marquee-track" 
-        :class="lIdx % 2 === 0 ? 'track-dir-rtl track-speed-' + (lIdx % 3) : 'track-dir-ltr track-speed-' + (lIdx % 3)"
-        @animationiteration="onIteration(lIdx)"
+        v-for="(slot, sIdx) in activeSlots" 
+        :key="'left-' + slot.slotId"
+        class="danmaku-lane"
+        :style="{ top: `${laneTops[sIdx % laneTops.length]}px` }"
       >
         <div 
-          v-for="(item, idx) in [...lane, ...lane]" 
-          :key="'item-' + lIdx + '-' + idx + '-' + item.id"
-          class="danmaku-capsule"
+          v-if="slot.item"
+          class="danmaku-runner-left"
+          :class="{ 'is-paused': slot.isPaused }"
+          :style="{ 
+            animationDuration: `${slot.duration}s`, 
+            animationDelay: `${slot.delay}s`
+          }"
+          @animationiteration="onSlotIteration(sIdx)"
         >
-          <!-- Compact Elegant Rounded Pill (Matches Subject Page) -->
-          <div class="danmaku-text-preview">
-            <span class="preview-dot"></span>
-            {{ item.message }}
-          </div>
+          <div 
+            class="danmaku-capsule"
+            @mouseenter="slot.isPaused = true"
+            @mouseleave="slot.isPaused = false"
+          >
+            <div class="danmaku-text-preview">
+              {{ slot.item.message }}
+            </div>
 
-          <!-- Hover Card Popover with Author, Full Message and Like button (Matches Subject Page) -->
-          <div class="danmaku-hover-card" @click.stop>
-            <div class="hover-card-header">
-              <span class="hover-tag">💬 {{ item.author }}</span>
-              <span class="hover-time">{{ item.time || '刚刚' }}</span>
+            <!-- 悬停详情卡片 -->
+            <div class="danmaku-hover-card" @click.stop>
+              <div class="hover-card-header">
+                <span class="hover-tag">💬 {{ slot.item.author }}</span>
+                <span class="hover-time">{{ slot.item.time || '刚刚' }}</span>
+              </div>
+              <div class="hover-card-content">
+                {{ slot.item.message }}
+              </div>
+              <div class="hover-card-footer">
+                <button 
+                  type="button"
+                  class="hover-like-btn" 
+                  :class="{ 'is-liked': slot.item.liked }"
+                  @click.stop="handleLike(slot.item)"
+                  :title="slot.item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
+                >
+                  <span class="like-heart">{{ slot.item.liked ? '❤️' : '🤍' }}</span>
+                  <span class="like-num">{{ slot.item.likes || 0 }}</span>
+                </button>
+              </div>
             </div>
-            <div class="hover-card-content">
-              {{ item.message }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧留白舞台：从右外侧向左滑行，滑入卡片右边缘穿入 (完全同构于 subject 页面) -->
+    <div class="danmaku-portal-stage danmaku-stage-right">
+      <div 
+        v-for="(slot, sIdx) in activeSlots" 
+        :key="'right-' + slot.slotId"
+        class="danmaku-lane"
+        :style="{ top: `${laneTops[sIdx % laneTops.length]}px` }"
+      >
+        <div 
+          v-if="slot.item"
+          class="danmaku-runner-right"
+          :class="{ 'is-paused': slot.isPaused }"
+          :style="{ 
+            animationDuration: `${slot.duration}s`, 
+            animationDelay: `${slot.delay}s`
+          }"
+        >
+          <div 
+            class="danmaku-capsule"
+            @mouseenter="slot.isPaused = true"
+            @mouseleave="slot.isPaused = false"
+          >
+            <div class="danmaku-text-preview">
+              {{ slot.item.message }}
             </div>
-            <div class="hover-card-footer">
-              <button 
-                type="button"
-                class="hover-like-btn" 
-                :class="{ 'is-liked': item.liked }"
-                @click.stop="handleLike(item)"
-                :title="item.liked ? (locale === 'zh' ? '已点赞 (飘走前可取消)' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
-              >
-                <span class="like-heart">{{ item.liked ? '❤️' : '🤍' }}</span>
-                <span class="like-num">{{ item.likes || 0 }}</span>
-              </button>
+
+            <!-- 悬停详情卡片 -->
+            <div class="danmaku-hover-card" @click.stop>
+              <div class="hover-card-header">
+                <span class="hover-tag">💡 {{ slot.item.author }}</span>
+                <span class="hover-time">{{ slot.item.time || '刚刚' }}</span>
+              </div>
+              <div class="hover-card-content">
+                {{ slot.item.message }}
+              </div>
+              <div class="hover-card-footer">
+                <button 
+                  type="button"
+                  class="hover-like-btn" 
+                  :class="{ 'is-liked': slot.item.liked }"
+                  @click.stop="handleLike(slot.item)"
+                  :title="slot.item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
+                >
+                  <span class="like-heart">{{ slot.item.liked ? '❤️' : '🤍' }}</span>
+                  <span class="like-num">{{ slot.item.likes || 0 }}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -167,130 +242,121 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.home-ambient-stage {
+.home-portal-wrapper {
   position: absolute;
   top: 0;
   bottom: 0;
-  /* Extends into the left and right gutters flanking the central card area */
-  left: -280px;
-  right: -280px;
+  left: 0;
+  right: 0;
   pointer-events: none;
-  overflow: hidden;
-  z-index: 10;
-  /* Smooth edge fading as comments enter and leave the side spaces */
-  mask-image: linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%);
 }
 
-.danmaku-lane-row {
+.danmaku-portal-stage {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 15;
+}
+
+.danmaku-stage-left {
+  left: -290px;
+  width: 290px;
+}
+
+.danmaku-stage-right {
+  right: -290px;
+  width: 290px;
+}
+
+.danmaku-lane {
   position: absolute;
   left: 0;
   right: 0;
   height: 40px;
-  white-space: nowrap;
   pointer-events: none;
 }
 
-.danmaku-marquee-track {
-  display: inline-flex;
-  gap: 36px;
+.danmaku-runner-left,
+.danmaku-runner-right {
+  position: absolute;
+  top: 0;
+  pointer-events: auto;
   white-space: nowrap;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
-  pointer-events: none;
 }
 
-.danmaku-lane-row:hover .danmaku-marquee-track {
-  animation-play-state: paused;
+.danmaku-runner-right {
+  animation-name: flyRightVoid;
 }
 
-/* Flight paths: crossing through right space, card area, and left space */
-.track-dir-rtl {
-  animation-name: flyRtlAcross;
+@keyframes flyRightVoid {
+  0% { transform: translateX(290px); }
+  100% { transform: translateX(-240px); }
 }
 
-.track-dir-ltr {
-  animation-name: flyLtrAcross;
+.danmaku-runner-left {
+  animation-name: flyLeftVoid;
 }
 
-.track-speed-0 { animation-duration: 44s; }
-.track-speed-1 { animation-duration: 52s; }
-.track-speed-2 { animation-duration: 48s; }
-
-@keyframes flyRtlAcross {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+@keyframes flyLeftVoid {
+  0% { transform: translateX(290px); }
+  100% { transform: translateX(-240px); }
 }
 
-@keyframes flyLtrAcross {
-  0% { transform: translateX(-50%); }
-  100% { transform: translateX(0); }
+.danmaku-runner-left.is-paused,
+.danmaku-runner-right.is-paused {
+  animation-play-state: paused !important;
+  z-index: 100 !important;
 }
 
-/* Isomorphic capsule structure matching DanmakuStage.vue */
 .danmaku-capsule {
   position: relative;
   display: inline-block;
   cursor: pointer;
-  pointer-events: auto;
 }
 
 .danmaku-text-preview {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 14px 5px 12px;
+  display: inline-block;
+  padding: 4px 14px;
   border-radius: 20px;
   font-size: 0.82rem;
   font-weight: 600;
   color: #3d3b38;
-  background: rgba(253, 250, 246, 0.94);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(220, 215, 206, 0.9);
-  box-shadow: 0 2px 8px rgba(44, 47, 50, 0.06);
-  max-width: 240px;
+  background: #fdfaf6;
+  border: 1px solid #dfdbd4;
+  box-shadow: 0 2px 6px rgba(44, 47, 50, 0.06);
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   transition: all 0.16s ease;
-  user-select: none;
-}
-
-.preview-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent-primary);
-  flex-shrink: 0;
-  opacity: 0.85;
 }
 
 .danmaku-capsule:hover .danmaku-text-preview {
-  background: #ffffff;
+  background: #fff;
   border-color: var(--accent-primary);
   color: var(--accent-primary);
-  box-shadow: 0 4px 14px rgba(194, 65, 40, 0.18);
-  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 95, 64, 0.18);
 }
 
-/* Hover Card Popover */
 .danmaku-hover-card {
   display: none;
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  min-width: 250px;
-  max-width: 300px;
+  min-width: 240px;
+  max-width: 280px;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(44, 47, 50, 0.12);
   padding: 10px 14px;
-  z-index: 100;
+  z-index: 999;
   white-space: normal;
   pointer-events: auto;
-  cursor: default;
 }
 
 .danmaku-capsule:hover .danmaku-hover-card {
@@ -306,41 +372,41 @@ onMounted(() => {
 }
 
 .hover-tag {
+  background: var(--accent-primary-light);
+  color: var(--accent-primary);
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--accent-primary);
-  background: var(--accent-primary-light);
-  padding: 1px 7px;
-  border-radius: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .hover-time {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--text-muted);
 }
 
 .hover-card-content {
   font-size: 0.8rem;
-  color: var(--text-main);
   line-height: 1.45;
+  color: var(--text-main);
   margin-bottom: 8px;
 }
 
 .hover-card-footer {
   display: flex;
-  align-items: center;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .hover-like-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
-  border-radius: 12px;
+  background: none;
   border: 1px solid var(--border-color);
-  background: var(--bg-surface);
-  font-size: 0.76rem;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -358,10 +424,9 @@ onMounted(() => {
   border-color: rgba(224, 36, 94, 0.3);
 }
 
-@media (max-width: 1280px) {
-  .home-ambient-stage {
-    left: -20px;
-    right: -20px;
+@media (max-width: 1200px) {
+  .danmaku-portal-stage {
+    display: none;
   }
 }
 </style>
