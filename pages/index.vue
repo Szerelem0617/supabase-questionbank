@@ -205,25 +205,25 @@ useSeoMeta({
   display: flex;
   flex-direction: column;
   background: var(--bg-surface);
-  /* 搜题同款常驻金线：常态全时显现，清晰定界，温暖典雅 */
-  border: 2px solid #f59e0b;
+  /* 柔和典雅金线：细致纤巧（1px），温润金铜色（#cca04c），清晰定界且克制雅致 */
+  border: 1px solid #cca04c;
   border-radius: 12px;
   padding: 16px 16px 14px;
   text-decoration: none;
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   z-index: 2;
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35), 0 2px 6px rgba(44, 47, 50, 0.05);
+  box-shadow: 0 2px 8px rgba(204, 160, 76, 0.16), 0 1px 3px rgba(44, 47, 50, 0.04);
 }
 
-/* 实体遮蔽相邻卡片之间的 16px 夹缝，让同排卡片在视觉上平滑阻隔弹幕，绝不覆盖卡片自身边框与阴影 */
-.subject-card::after {
+/* 实体遮蔽相邻卡片之间的 16px 夹缝：从卡片外侧 +1px 处延伸，彻底杜绝覆盖卡片右边框 */
+.subject-card:not(:last-child)::after {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  right: -16px;
-  width: 16px;
+  left: calc(100% + 1px);
+  width: 14px;
   background: var(--bg-canvas);
   pointer-events: none;
   z-index: 1;
@@ -231,8 +231,8 @@ useSeoMeta({
 
 .subject-card:hover {
   transform: translateY(-2px);
-  border-color: #d97706;
-  box-shadow: 0 0 18px rgba(245, 158, 11, 0.55), 0 8px 24px rgba(180, 83, 9, 0.2);
+  border-color: #b38029;
+  box-shadow: 0 4px 16px rgba(179, 128, 41, 0.22), 0 2px 6px rgba(44, 47, 50, 0.06);
 }
 
 .card-top {
