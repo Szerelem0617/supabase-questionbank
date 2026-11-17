@@ -258,7 +258,7 @@ const messages = {
     singleQuestion: {
       copyStitched: 'Copy Stitched Image',
       copying: 'Stitching...',
-      danmaku: 'Danmaku',
+      danmaku: 'Comments',
       on: 'ON',
       off: 'OFF',
       subQuestion: 'Part ({sub})',
@@ -329,7 +329,7 @@ const messages = {
       favTitle: 'Custom Favorites Management',
       favDesc: 'Click the top-left 📁 folder icon anytime to open the folder panel. Bookmark individual sub-questions or entire questions, and easily organize them into folders.',
       notesTitle: 'Mark Schemes & Community Notes',
-      notesDesc: 'Click 💡 to reveal official Mark Schemes with zero delay. Click 💬 to add notes that fly as danmaku across the paper. Click 📋 to seamlessly stitch and copy the entire multi-part question as a single HD image.',
+      notesDesc: 'Click 💡 to reveal official Mark Schemes with zero delay. Click 💬 to add notes and comments that fly live across the paper. Click 📋 to seamlessly stitch and copy the entire multi-part question as a single HD image.',
     }
   }
 }

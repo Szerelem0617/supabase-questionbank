@@ -89,7 +89,7 @@ async function handleSubmit() {
         <div class="modal-header">
           <div class="mh-left">
             <span class="mh-icon">💬</span>
-            <h3 class="mh-title">{{ locale === 'zh' ? '考友交流留言 · 实时弹幕上墙' : 'Community Board · Post Live Danmaku' }}</h3>
+            <h3 class="mh-title">{{ locale === 'zh' ? '考友交流留言 · 实时弹幕上墙' : 'Community Board · Post Live Comment' }}</h3>
           </div>
           <button type="button" class="btn-close" @click="emit('close')">&times;</button>
         </div>
@@ -124,7 +124,7 @@ async function handleSubmit() {
               rows="3"
               maxlength="140"
               class="comment-textarea"
-              :placeholder="locale === 'zh' ? '写下你的备考心得、做题技巧或祝福，发送后将立即在首页弹幕浮动上墙...' : 'Share your physics study tips or encouragement, it will float live across the homepage...'"
+              :placeholder="locale === 'zh' ? '写下你的备考心得、做题技巧或祝福，发送后将立即在弹幕浮动上墙...' : 'Share your physics study tips or encouragement, it will float live across the site...'"
               @keydown.enter.meta.prevent="handleSubmit"
               @keydown.enter.ctrl.prevent="handleSubmit"
             ></textarea>
@@ -150,7 +150,7 @@ async function handleSubmit() {
               :disabled="isSubmitting || !commentText.trim()"
               @click="handleSubmit"
             >
-              {{ isSubmitting ? (locale === 'zh' ? '发送中...' : 'Posting...') : (locale === 'zh' ? '🚀 发送并上墙' : '🚀 Post Danmaku') }}
+              {{ isSubmitting ? (locale === 'zh' ? '发送中...' : 'Posting...') : (locale === 'zh' ? '🚀 发送并上墙' : '🚀 Post Comment') }}
             </button>
           </div>
         </div>

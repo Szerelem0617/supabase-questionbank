@@ -1,10 +1,16 @@
 <script setup>
+import HomeCommentModal from '~/components/home/HomeCommentModal.vue'
+
 const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { profile, fetchProfile } = useUserProfile()
 const { locale, toggleLocale, t } = useI18n()
 const danmakuStore = useDanmaku()
 const isHelpModalOpen = ref(false)
+
+function onGlobalMessagePosted(msg) {
+  danmakuStore.broadcastGlobalComment(msg)
+}
 
 // Fetch profile whenever user is logged in
 watch(user, async (newUser) => {
@@ -36,29 +42,39 @@ async function signOut() {
         </div>
         
         <div class="nav-actions">
-          <!-- 弹幕全站开关按钮 (高度 34px, 圆角 8px) -->
-          <button 
-            type="button" 
-            class="danmaku-switch-btn" 
+          <!-- 弹幕与留言双功能分段按钮 (高度 34px, 圆角 8px, 清晰界限分段交互) -->
+          <div 
+            class="comment-split-control" 
             :class="{ 'is-off': !danmakuStore.danmakuEnabled.value }"
-            @click="danmakuStore.toggleDanmaku"
-            :title="danmakuStore.danmakuEnabled.value 
-              ? (locale === 'zh' ? '全站弹幕: 已开启 (点击关闭)' : 'Danmaku: ON (Click to turn off)') 
-              : (locale === 'zh' ? '全站弹幕: 已关闭 (点击开启)' : 'Danmaku: OFF (Click to turn on)')"
           >
-            <svg v-if="danmakuStore.danmakuEnabled.value" class="danmaku-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-              <path d="M8 10h.01M12 10h.01M16 10h.01" />
-            </svg>
-            <svg v-else class="danmaku-nav-icon is-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-              <line x1="2" y1="2" x2="22" y2="22" />
-            </svg>
-            <span class="danmaku-nav-text">{{ locale === 'zh' ? '弹幕' : 'Danmaku' }}</span>
-            <span class="danmaku-nav-pill" :class="{ 'pill-on': danmakuStore.danmakuEnabled.value }">
-              {{ danmakuStore.danmakuEnabled.value ? (locale === 'zh' ? '开' : 'ON') : (locale === 'zh' ? '关' : 'OFF') }}
-            </span>
-          </button>
+            <!-- 点击点 1：留下弹幕留言评论 (Emoji / 弹幕图标与文案) -->
+            <button
+              type="button"
+              class="csc-btn csc-post-btn"
+              @click="danmakuStore.openCommentModal"
+              :title="locale === 'zh' ? '留下弹幕评论' : 'Leave a comment'"
+            >
+              <span class="csc-icon">💬</span>
+              <span class="csc-text">{{ locale === 'zh' ? '弹幕' : 'Comment' }}</span>
+            </button>
+
+            <!-- 清晰分界线 -->
+            <div class="csc-divider" aria-hidden="true"></div>
+
+            <!-- 点击点 2：开 / 关 全局弹幕显示 -->
+            <button
+              type="button"
+              class="csc-btn csc-toggle-btn"
+              @click="danmakuStore.toggleDanmaku"
+              :title="danmakuStore.danmakuEnabled.value 
+                ? (locale === 'zh' ? '弹幕显示: 已开启 (点击关闭)' : 'Comments: ON (Click to turn off)') 
+                : (locale === 'zh' ? '弹幕显示: 已关闭 (点击开启)' : 'Comments: OFF (Click to turn on)')"
+            >
+              <span class="csc-pill" :class="{ 'pill-on': danmakuStore.danmakuEnabled.value }">
+                {{ danmakuStore.danmakuEnabled.value ? (locale === 'zh' ? '开' : 'ON') : (locale === 'zh' ? '关' : 'OFF') }}
+              </span>
+            </button>
+          </div>
 
           <!-- 帮助与功能提示按钮 (i) -->
           <button 
@@ -111,6 +127,13 @@ async function signOut() {
 
     <!-- User Guide & Shortcuts Info Modal -->
     <HelpModal :isOpen="isHelpModalOpen" @close="isHelpModalOpen = false" />
+
+    <!-- Universal Comment / Danmaku Modal accessible from Topbar -->
+    <HomeCommentModal 
+      :isOpen="danmakuStore.isCommentModalOpen.value" 
+      @close="danmakuStore.closeCommentModal" 
+      @message-posted="onGlobalMessagePosted" 
+    />
   </div>
 </template>
 
@@ -182,68 +205,92 @@ async function signOut() {
   gap: 8px;
 }
 
-.danmaku-switch-btn {
+.comment-split-control {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   height: 34px;
-  padding: 0 10px;
   border-radius: 8px;
   border: 1px solid var(--border-color);
   background: var(--bg-surface);
-  color: var(--text-main);
-  cursor: pointer;
-  transition: all 0.16s ease;
-  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.03);
+  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.04);
   box-sizing: border-box;
+  overflow: hidden;
+  transition: all 0.16s ease;
   user-select: none;
 }
 
-.danmaku-switch-btn:hover {
+.comment-split-control:hover {
+  border-color: var(--accent-primary-border);
+  box-shadow: 0 2px 6px rgba(194, 65, 40, 0.1);
+}
+
+.comment-split-control.is-off {
   background: var(--bg-surface-subtle);
-  border-color: var(--accent-primary);
-  transform: translateY(-1px);
+  border-color: var(--border-color);
 }
 
-.danmaku-switch-btn.is-off {
-  opacity: 0.65;
-  background: var(--bg-surface-subtle);
-  color: var(--text-muted);
+.csc-btn {
+  background: transparent;
+  border: none;
+  height: 100%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+  box-sizing: border-box;
 }
 
-.danmaku-nav-icon {
-  width: 15px;
-  height: 15px;
-  color: var(--accent-primary);
-  flex-shrink: 0;
-  display: block;
-}
-
-.danmaku-nav-icon.is-muted {
-  color: var(--text-muted);
-}
-
-.danmaku-nav-text {
-  font-size: 0.8rem;
-  font-weight: 600;
+.csc-post-btn {
+  gap: 5px;
+  padding: 0 10px 0 9px;
   color: var(--text-main);
 }
 
-.danmaku-switch-btn.is-off .danmaku-nav-text {
-  color: var(--text-muted);
+.csc-post-btn:hover {
+  background: var(--accent-primary-light);
+  color: var(--accent-primary);
 }
 
-.danmaku-nav-pill {
-  font-size: 0.65rem;
+.csc-icon {
+  font-size: 0.88rem;
+  line-height: 1;
+}
+
+.csc-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.csc-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-color);
+  flex-shrink: 0;
+}
+
+.csc-toggle-btn {
+  padding: 0 8px;
+}
+
+.csc-toggle-btn:hover {
+  background: rgba(44, 47, 50, 0.04);
+}
+
+.csc-pill {
+  font-size: 0.68rem;
   font-weight: 700;
-  padding: 1px 5px;
+  padding: 2px 6px;
   border-radius: 4px;
   background: rgba(44, 47, 50, 0.08);
   color: var(--text-muted);
   line-height: 1.2;
+  transition: all 0.16s ease;
 }
 
-.danmaku-nav-pill.pill-on {
+.csc-pill.pill-on {
   background: var(--accent-primary-light);
   color: var(--accent-primary);
 }

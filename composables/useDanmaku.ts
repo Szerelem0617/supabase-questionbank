@@ -41,6 +41,18 @@ export const CURATED_PHYSICS_TIPS = [
   { author: '学霸小周', message: '简谐运动 SHM 加速度公式 a = -ω²x，负号一定不能丢！', likes: 36, time: '2小时前' }
 ]
 
+// 社区通用全局留言弹幕默认池
+export const DEFAULT_COMMUNITY_COMMENTS = [
+  { id: 'hc-1', author: 'Physics_Pro', message: 'CAIE 9702 P4 准备中，大家作图记得用直尺，斜率要在图线上取相距一半以上的两点！', likes: 48, time: '刚刚' },
+  { id: 'hc-2', author: 'Alex.Cambridge', message: 'CAIE 简答题要求写 force is the rate of change of momentum，不要只写 F=ma 哦！', likes: 36, time: '5分钟前' },
+  { id: 'hc-3', author: 'Edexcel_Top', message: 'Edexcel 坐标轴单位经常是 cm/s 或 ms，千万先看清单位再代入公式！', likes: 29, time: '12分钟前' },
+  { id: 'hc-4', author: '牛顿的小迷弟', message: '空气阻力做的功 W = ΔEk + ΔEp，千万别漏掉势能损失！', likes: 41, time: '18分钟前' },
+  { id: 'hc-5', author: '考神附体2026', message: '终端速度 terminal velocity：当阻力增大等于重力时合力为0，加速度归零恒速下落。', likes: 52, time: '25分钟前' },
+  { id: 'hc-6', author: 'BPhO冲金选手', message: '祝大家五月夏季大考全部稳拿 A*！物理必胜！🎉', likes: 64, time: '30分钟前' },
+  { id: 'hc-7', author: 'Sarah_Astar', message: '有效数字 (Significant Figures) 严格与题目数据对齐，一般保留 2-3 位有效数字。', likes: 45, time: '35分钟前' },
+  { id: 'hc-8', author: '电磁学小能手', message: '法拉第电磁感应定律 E = -N(ΔΦ/Δt)，别忘了匝数 N！', likes: 33, time: '40分钟前' }
+]
+
 // 确保每个题目的默认题目都有丰富生动的弹幕数据
 export function getQuestionSeedComments(rawNum: string = '', questionId: any = ''): any[] {
   const key = String(rawNum).trim()
@@ -77,9 +89,28 @@ export function checkIsLiked(commentId: string | number): boolean {
   return localStorage.getItem(`danmaku_like_${commentId}`) === 'true'
 }
 
-// Global shared danmaku visibility state
+// Global shared danmaku visibility state & modal triggers
 const danmakuEnabled = ref(true)
 let isDanmakuPrefInitialized = false
+
+// 全局留言弹窗状态与即时广播总线
+const isCommentModalOpen = ref(false)
+const latestGlobalComment = ref<any>(null)
+const globalCommentsList = ref<any[]>([...DEFAULT_COMMUNITY_COMMENTS])
+
+export function openCommentModal() {
+  isCommentModalOpen.value = true
+}
+
+export function closeCommentModal() {
+  isCommentModalOpen.value = false
+}
+
+export function broadcastGlobalComment(msg: any) {
+  if (!msg) return
+  latestGlobalComment.value = msg
+  globalCommentsList.value.unshift(msg)
+}
 
 export function initDanmakuPreference() {
   if (typeof window === 'undefined' || isDanmakuPrefInitialized) return
@@ -203,6 +234,12 @@ export function useDanmaku() {
   return {
     danmakuEnabled,
     toggleDanmaku,
+    isCommentModalOpen,
+    openCommentModal,
+    closeCommentModal,
+    broadcastGlobalComment,
+    latestGlobalComment,
+    globalCommentsList,
     MAX_DANMAKU_DISPLAY,
     laneTops,
     activeSlots,

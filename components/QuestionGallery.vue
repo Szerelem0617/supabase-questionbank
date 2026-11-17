@@ -10,6 +10,7 @@ import { useSubjectPool } from '~/composables/useSubjectPool'
 
 import DualSearchBar from './gallery/DualSearchBar.vue'
 import DanmakuStage from './gallery/DanmakuStage.vue'
+import SearchDanmakuStage from './gallery/SearchDanmakuStage.vue'
 import UnifiedQuestionStream from './gallery/UnifiedQuestionStream.vue'
 import QuickAlbumPicker from './gallery/QuickAlbumPicker.vue'
 
@@ -691,18 +692,22 @@ onUnmounted(() => {
       @close-toast="showToastNotification = false"
     />
 
-    <!-- 2. Dual Independent Search Bars (SQ & MCQ) -->
-    <DualSearchBar 
-      v-model:sqKeyword="searchStore.sqKeyword.value"
-      v-model:sqSelectedPaper="searchStore.sqSelectedPaper.value"
-      v-model:mcqKeyword="searchStore.mcqKeyword.value"
-      v-model:mcqSelectedPaper="searchStore.mcqSelectedPaper.value"
-      :sqPaperOptions="poolStore.sqPaperOptions.value.length > 0 ? poolStore.sqPaperOptions.value : searchStore.sqPaperOptions.value"
-      :mcqPaperOptions="poolStore.mcqPaperOptions.value.length > 0 ? poolStore.mcqPaperOptions.value : searchStore.mcqPaperOptions.value"
-      :isSearching="searchStore.isSearching.value"
-      :searchActiveType="searchStore.searchActiveType.value"
-      @search="(type) => { isFavoriteMode = false; searchStore.triggerSearch(type) }"
-    />
+    <!-- 2. Dual Independent Search Bars (SQ & MCQ) with Ambient Global Danmaku -->
+    <div class="search-bar-with-danmaku-wrap">
+      <SearchDanmakuStage :showToast="showToast" />
+
+      <DualSearchBar 
+        v-model:sqKeyword="searchStore.sqKeyword.value"
+        v-model:sqSelectedPaper="searchStore.sqSelectedPaper.value"
+        v-model:mcqKeyword="searchStore.mcqKeyword.value"
+        v-model:mcqSelectedPaper="searchStore.mcqSelectedPaper.value"
+        :sqPaperOptions="poolStore.sqPaperOptions.value.length > 0 ? poolStore.sqPaperOptions.value : searchStore.sqPaperOptions.value"
+        :mcqPaperOptions="poolStore.mcqPaperOptions.value.length > 0 ? poolStore.mcqPaperOptions.value : searchStore.mcqPaperOptions.value"
+        :isSearching="searchStore.isSearching.value"
+        :searchActiveType="searchStore.searchActiveType.value"
+        @search="(type) => { isFavoriteMode = false; searchStore.triggerSearch(type) }"
+      />
+    </div>
 
     <!-- 3. Unified Question Stream with Danmaku (Scheme D) -->
     <div class="stream-with-danmaku-container">
@@ -774,6 +779,11 @@ onUnmounted(() => {
 .gallery-wrapper {
   margin-top: 10px;
   position: relative;
+}
+
+.search-bar-with-danmaku-wrap {
+  position: relative;
+  width: 100%;
 }
 
 .stream-with-danmaku-container {

@@ -1,42 +1,44 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { useDanmaku, checkIsLiked } from '~/composables/useDanmaku'
-
-const props = defineProps({
-  newlyPostedMessage: { type: Object, default: null }
-})
-
-const emit = defineEmits(['like-message'])
+import { ref, onMounted, watch } from 'vue'
+import { useDanmaku, checkIsLiked, DEFAULT_COMMUNITY_COMMENTS } from '~/composables/useDanmaku'
 
 const client = useSupabaseClient()
-const { t, locale } = useI18n()
+const { locale } = useI18n()
 const danmakuStore = useDanmaku()
-
-// Pre-seeded community comments pool (ensures homepage is always vibrant)
-const DEFAULT_COMMUNITY_COMMENTS = [
-  { id: 'hc-1', author: 'Physics_Pro', message: 'CAIE 9702 P4 准备中，大家作图记得用直尺，斜率要在图线上取相距一半以上的两点！', likes: 48, time: '刚刚' },
-  { id: 'hc-2', author: 'Alex.Cambridge', message: 'CAIE 简答题要求写 force is the rate of change of momentum，不要只写 F=ma 哦！', likes: 36, time: '5分钟前' },
-  { id: 'hc-3', author: 'Edexcel_Top', message: 'Edexcel 坐标轴单位经常是 cm/s 或 ms，千万先看清单位再代入公式！', likes: 29, time: '12分钟前' },
-  { id: 'hc-4', author: '牛顿的小迷弟', message: '空气阻力做的功 W = ΔEk + ΔEp，千万别漏掉势能损失！', likes: 41, time: '18分钟前' },
-  { id: 'hc-5', author: '考神附体2026', message: '终端速度 terminal velocity：当阻力增大等于重力时合力为0，加速度归零恒速下落。', likes: 52, time: '25分钟前' },
-  { id: 'hc-6', author: 'BPhO冲金选手', message: '祝大家五月夏季大考全部稳拿 A*！物理必胜！🎉', likes: 64, time: '30分钟前' }
-]
 
 const commentsList = ref([...DEFAULT_COMMUNITY_COMMENTS])
 
-// 2 lanes for homepage
+// 4 distinct floating lanes across the cards area
 const lane0Items = ref([])
 const lane1Items = ref([])
+const lane2Items = ref([])
+const lane3Items = ref([])
 
 function distributeToLanes() {
   const l0 = []
   const l1 = []
+  const l2 = []
+  const l3 = []
+
   commentsList.value.forEach((item, idx) => {
-    if (idx % 2 === 0) l0.push(item)
-    else l1.push(item)
+    const mod = idx % 4
+    if (mod === 0) l0.push(item)
+    else if (mod === 1) l1.push(item)
+    else if (mod === 2) l2.push(item)
+    else l3.push(item)
   })
-  lane0Items.value = l0
-  lane1Items.value = l1
+
+  // Ensure each lane has at least 3 items for infinite marquee loop
+  const ensureMin = (arr) => {
+    if (arr.length === 0) return [...DEFAULT_COMMUNITY_COMMENTS.slice(0, 3)]
+    if (arr.length < 3) return [...arr, ...arr, ...arr]
+    return arr
+  }
+
+  lane0Items.value = ensureMin(l0)
+  lane1Items.value = ensureMin(l1)
+  lane2Items.value = ensureMin(l2)
+  lane3Items.value = ensureMin(l3)
 }
 
 // Fetch real comments from Supabase
@@ -46,7 +48,7 @@ async function fetchHomepageComments() {
       .from('comments')
       .select('id, created_at, message, likes, user_id, profiles(display_name, avatar_url)')
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(30)
 
     if (!error && data && data.length > 0) {
       const dbComments = data.map(c => ({
@@ -58,7 +60,6 @@ async function fetchHomepageComments() {
         time: formatTimeAgo(c.created_at)
       }))
 
-      // Combine with defaults
       commentsList.value = [...dbComments, ...DEFAULT_COMMUNITY_COMMENTS]
     }
   } catch (err) {
@@ -79,8 +80,8 @@ function formatTimeAgo(dateStr) {
   return `${Math.floor(hours / 24)}天前`
 }
 
-// Watch for newly posted message
-watch(() => props.newlyPostedMessage, (newMsg) => {
+// Listen to global comments broadcast
+watch(danmakuStore.latestGlobalComment, (newMsg) => {
   if (newMsg) {
     commentsList.value.unshift(newMsg)
     distributeToLanes()
@@ -92,8 +93,8 @@ function handleLike(item) {
 }
 
 function onTrackLoop(laneIdx) {
-  // 弹幕离开本轮视野飘走后，重置临时选中高亮态，双向匿名
-  const targetLane = laneIdx === 0 ? lane0Items.value : lane1Items.value
+  const lanes = [lane0Items.value, lane1Items.value, lane2Items.value, lane3Items.value]
+  const targetLane = lanes[laneIdx] || []
   targetLane.forEach(item => {
     item.liked = false
   })
@@ -106,10 +107,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="danmakuStore.danmakuEnabled.value" class="home-danmaku-stage">
-    <!-- Lane 1 (Fly left-to-right or right-to-left) -->
-    <div class="h-lane lane-top">
-      <div class="h-lane-track track-speed-normal" @animationiteration="onTrackLoop(0)">
+  <div v-if="danmakuStore.danmakuEnabled.value" class="home-ambient-stage" aria-hidden="true">
+    <!-- Lane 0 (Top area, across CAIE cards) -->
+    <div class="h-lane lane-pos-0">
+      <div class="h-lane-track track-dir-ltr track-speed-0" @animationiteration="onTrackLoop(0)">
         <div 
           v-for="(item, idx) in [...lane0Items, ...lane0Items]" 
           :key="'l0-' + idx + '-' + item.id" 
@@ -122,7 +123,7 @@ onMounted(() => {
             class="hc-like-btn" 
             :class="{ 'is-liked': item.liked }" 
             @click.stop="handleLike(item)"
-            :title="item.liked ? '已点赞 (飘走前可点击取消)' : '点赞赞同'"
+            :title="item.liked ? (locale === 'zh' ? '已点赞 (飘走前可点击取消)' : 'Liked') : (locale === 'zh' ? '点赞赞同' : 'Like')"
           >
             {{ item.liked ? '❤️' : '🤍' }} {{ item.likes || 0 }}
           </button>
@@ -130,9 +131,9 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Lane 2 -->
-    <div class="h-lane lane-bottom">
-      <div class="h-lane-track track-speed-slower" @animationiteration="onTrackLoop(1)">
+    <!-- Lane 1 (Across EDX cards) -->
+    <div class="h-lane lane-pos-1">
+      <div class="h-lane-track track-dir-rtl track-speed-1" @animationiteration="onTrackLoop(1)">
         <div 
           v-for="(item, idx) in [...lane1Items, ...lane1Items]" 
           :key="'l1-' + idx + '-' + item.id" 
@@ -145,7 +146,53 @@ onMounted(() => {
             class="hc-like-btn" 
             :class="{ 'is-liked': item.liked }" 
             @click.stop="handleLike(item)"
-            :title="item.liked ? '已点赞 (飘走前可点击取消)' : '点赞赞同'"
+            :title="item.liked ? (locale === 'zh' ? '已点赞 (飘走前可点击取消)' : 'Liked') : (locale === 'zh' ? '点赞赞同' : 'Like')"
+          >
+            {{ item.liked ? '❤️' : '🤍' }} {{ item.likes || 0 }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lane 2 (Across AQA cards) -->
+    <div class="h-lane lane-pos-2">
+      <div class="h-lane-track track-dir-ltr track-speed-2" @animationiteration="onTrackLoop(2)">
+        <div 
+          v-for="(item, idx) in [...lane2Items, ...lane2Items]" 
+          :key="'l2-' + idx + '-' + item.id" 
+          class="h-capsule"
+        >
+          <span class="hc-tag">⚡ {{ item.author }}</span>
+          <span class="hc-msg">{{ item.message }}</span>
+          <button 
+            type="button" 
+            class="hc-like-btn" 
+            :class="{ 'is-liked': item.liked }" 
+            @click.stop="handleLike(item)"
+            :title="item.liked ? (locale === 'zh' ? '已点赞 (飘走前可点击取消)' : 'Liked') : (locale === 'zh' ? '点赞赞同' : 'Like')"
+          >
+            {{ item.liked ? '❤️' : '🤍' }} {{ item.likes || 0 }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lane 3 (Across Olympiad cards) -->
+    <div class="h-lane lane-pos-3">
+      <div class="h-lane-track track-dir-rtl track-speed-3" @animationiteration="onTrackLoop(3)">
+        <div 
+          v-for="(item, idx) in [...lane3Items, ...lane3Items]" 
+          :key="'l3-' + idx + '-' + item.id" 
+          class="h-capsule"
+        >
+          <span class="hc-tag">🏆 {{ item.author }}</span>
+          <span class="hc-msg">{{ item.message }}</span>
+          <button 
+            type="button" 
+            class="hc-like-btn" 
+            :class="{ 'is-liked': item.liked }" 
+            @click.stop="handleLike(item)"
+            :title="item.liked ? (locale === 'zh' ? '已点赞 (飘走前可点击取消)' : 'Liked') : (locale === 'zh' ? '点赞赞同' : 'Like')"
           >
             {{ item.liked ? '❤️' : '🤍' }} {{ item.likes || 0 }}
           </button>
@@ -156,65 +203,81 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.home-danmaku-stage {
-  position: relative;
-  width: 100%;
-  max-width: 1240px;
-  margin: 0 auto 20px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.home-ambient-stage {
+  position: absolute;
+  top: 0;
+  left: -20px;
+  right: -20px;
+  bottom: 0;
   pointer-events: none;
-  mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+  overflow: hidden;
+  z-index: 5;
+  mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
 }
 
 .h-lane {
-  position: relative;
-  width: 100%;
-  height: 34px;
-  overflow: hidden;
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 38px;
+  overflow: visible;
   white-space: nowrap;
 }
+
+/* 4 comfortable lanes distributed over card section entities */
+.lane-pos-0 { top: 45px; }
+.lane-pos-1 { top: 290px; }
+.lane-pos-2 { top: 570px; }
+.lane-pos-3 { top: 880px; }
 
 .h-lane-track {
   display: inline-flex;
-  gap: 20px;
+  gap: 28px;
   white-space: nowrap;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
-  animation-name: marqueeScroll;
 }
 
-.track-speed-normal {
-  animation-duration: 38s;
+.track-dir-rtl {
+  animation-name: marqueeRtl;
 }
 
-.track-speed-slower {
-  animation-duration: 46s;
-  animation-direction: reverse;
+.track-dir-ltr {
+  animation-name: marqueeLtr;
 }
+
+.track-speed-0 { animation-duration: 48s; }
+.track-speed-1 { animation-duration: 40s; }
+.track-speed-2 { animation-duration: 52s; }
+.track-speed-3 { animation-duration: 44s; }
 
 .h-lane:hover .h-lane-track {
   animation-play-state: paused;
 }
 
-@keyframes marqueeScroll {
+@keyframes marqueeRtl {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
+}
+
+@keyframes marqueeLtr {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
 }
 
 .h-capsule {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 32px;
+  height: 34px;
   padding: 0 12px 0 8px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  box-shadow: 0 2px 6px rgba(44, 47, 50, 0.05);
+  background: rgba(253, 250, 246, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(220, 215, 206, 0.85);
+  border-radius: 17px;
+  box-shadow: 0 3px 12px rgba(44, 47, 50, 0.08);
   pointer-events: auto;
   cursor: default;
   transition: all 0.16s ease;
@@ -222,9 +285,10 @@ onMounted(() => {
 }
 
 .h-capsule:hover {
-  transform: translateY(-1px) scale(1.02);
+  transform: translateY(-2px) scale(1.02);
   border-color: var(--accent-primary);
-  box-shadow: 0 4px 12px rgba(194, 65, 40, 0.14);
+  box-shadow: 0 6px 18px rgba(194, 65, 40, 0.16);
+  z-index: 20;
 }
 
 .hc-tag {
@@ -238,9 +302,9 @@ onMounted(() => {
 }
 
 .hc-msg {
-  font-size: 0.8rem;
-  color: var(--text-main);
+  font-size: 0.82rem;
   font-weight: 500;
+  color: var(--text-main);
   max-width: 320px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -250,16 +314,15 @@ onMounted(() => {
 .hc-like-btn {
   background: transparent;
   border: none;
-  cursor: pointer;
-  font-size: 0.74rem;
-  font-weight: 600;
+  font-size: 0.76rem;
   color: var(--text-muted);
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 2px 6px;
-  border-radius: 8px;
-  transition: all 0.15s ease;
+  padding: 2px 5px;
+  border-radius: 10px;
+  transition: all 0.14s ease;
 }
 
 .hc-like-btn:hover {
@@ -268,7 +331,13 @@ onMounted(() => {
 }
 
 .hc-like-btn.is-liked {
-  color: var(--accent-primary);
+  color: #e0245e;
   font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .lane-pos-2, .lane-pos-3 {
+    display: none;
+  }
 }
 </style>
