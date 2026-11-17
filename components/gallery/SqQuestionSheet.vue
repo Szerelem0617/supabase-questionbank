@@ -3,6 +3,8 @@ const { t, locale } = useI18n()
 
 const props = defineProps({
   groupQuestions: { type: Array, default: () => [] },
+  matchedSubQIds: { type: Array, default: () => [] },
+  isSearchActive: { type: Boolean, default: false },
   expandedAnswers: { type: Object, default: () => ({}) },
   expandedComments: { type: Object, default: () => ({}) },
   isShortSubQ: { type: Object, default: () => ({}) },
@@ -22,6 +24,13 @@ const emit = defineEmits([
   'toggle-like-comment',
   'subq-image-load'
 ])
+
+function isSubQMatched(subQId) {
+  if (!props.isSearchActive || !props.matchedSubQIds || props.matchedSubQIds.length === 0) {
+    return false
+  }
+  return props.matchedSubQIds.some(id => String(id) === String(subQId))
+}
 
 function getImageUrl(path) {
   if (!path) return ''
@@ -49,16 +58,24 @@ function onImageError(e, path) {
       :key="subQ.id" 
       :id="`subq-row-${subQ.id}`"
       class="subq-row-container"
+      :class="{ 'highlighted-subq': isSubQMatched(subQ.id) }"
     >
       <!-- Subquestion Row (Left Image, Right Action Dock) -->
-      <div class="subq-main-row">
+      <div 
+        class="subq-main-row"
+        :class="{ 'highlighted-row': isSubQMatched(subQ.id) }"
+      >
         <!-- Left: Question Image -->
-        <div class="subq-img-wrap">
+        <div 
+          class="subq-img-wrap"
+          :class="{ 'highlighted-wrap': isSubQMatched(subQ.id) }"
+        >
           <img 
             v-if="subQ.image_path"
             :src="getImageUrl(subQ.image_path)" 
             :alt="`Sub-question ${subQ.question_raw_number}`"
             class="exam-subq-image"
+            :class="{ 'highlighted': isSubQMatched(subQ.id) }"
             loading="eager"
             decoding="async"
             @error="(e) => onImageError(e, subQ.image_path)"
@@ -219,6 +236,21 @@ function onImageError(e, path) {
   width: 100%;
   height: auto;
   object-fit: contain;
+  transition: outline 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* 搜题命中小问高亮金线：完美还原思源高亮金线美学 (Iconic Siyuan Gold Highlight Line) */
+.exam-subq-image.highlighted {
+  outline: 3px solid #FFD700 !important;
+  outline-offset: -3px !important;
+  border-radius: 6px !important;
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.75), inset 0 0 6px rgba(255, 215, 0, 0.2) !important;
+  z-index: 2 !important;
+  position: relative !important;
+}
+
+.subq-row-container.highlighted-subq {
+  background: rgba(255, 215, 0, 0.05);
 }
 
 .subq-action-dock {

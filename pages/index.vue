@@ -205,15 +205,15 @@ useSeoMeta({
   display: flex;
   flex-direction: column;
   background: var(--bg-surface);
-  /* 显式精装典籍边界线：清晰定义卡片轮廓，兼顾学术克制美学 */
-  border: 1px solid #d4cbb8;
+  /* 典雅烫金金线边框：完美呼应搜题高亮金线，清晰定义卡片边界 */
+  border: 1.5px solid #d49a24;
   border-radius: 12px;
   padding: 16px 16px 14px;
   text-decoration: none;
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   z-index: 2;
-  box-shadow: 0 2px 8px rgba(44, 47, 50, 0.05), 0 1px 2px rgba(44, 47, 50, 0.03);
+  box-shadow: 0 0 0 1px rgba(212, 154, 36, 0.15), 0 3px 12px rgba(212, 154, 36, 0.12), 0 1px 3px rgba(44, 47, 50, 0.04);
 }
 
 /* 实体遮蔽相邻卡片之间的 16px 夹缝，让卡片实体与夹缝连成整体遮挡弹幕，避免在窄缝露馅 */
@@ -232,8 +232,8 @@ useSeoMeta({
 
 .subject-card:hover {
   transform: translateY(-2px);
-  border-color: var(--accent-primary);
-  box-shadow: 0 8px 24px rgba(194, 65, 40, 0.12), 0 2px 6px rgba(194, 65, 40, 0.06);
+  border-color: #b45309;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.4), 0 8px 24px rgba(180, 83, 9, 0.18);
 }
 
 .card-top {

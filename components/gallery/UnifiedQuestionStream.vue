@@ -574,6 +574,8 @@ defineExpose({
               <SqQuestionSheet 
                 v-if="group.paper_type === 'SQ'"
                 :groupQuestions="group.subQuestions || [group]"
+                :matchedSubQIds="group.matchedSubQIds || []"
+                :isSearchActive="Boolean(searchActiveKeyword)"
                 :expandedAnswers="expandedAnswers"
                 :expandedComments="expandedComments"
                 :isShortSubQ="isShortSubQ"
