@@ -164,7 +164,7 @@ useSeoMeta({
 
 .spec-section {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   margin-top: 10px;
 }
 
@@ -174,6 +174,8 @@ useSeoMeta({
   margin-bottom: 16px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border-color);
+  position: relative;
+  z-index: 2;
 }
 
 .section-title {
@@ -189,6 +191,8 @@ useSeoMeta({
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+  position: relative;
+  z-index: 2;
 }
 
 .subject-card {
@@ -201,7 +205,22 @@ useSeoMeta({
   text-decoration: none;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
+  z-index: 2;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* 实体遮蔽相邻卡片之间的 16px 夹缝，让卡片实体与夹缝连成整体遮挡弹幕，避免在窄缝露馅 */
+.subject-card::before {
+  content: '';
+  position: absolute;
+  top: -9px;
+  bottom: -9px;
+  left: -9px;
+  right: -9px;
+  background: var(--bg-canvas);
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 6px;
 }
 
 .subject-card:hover {

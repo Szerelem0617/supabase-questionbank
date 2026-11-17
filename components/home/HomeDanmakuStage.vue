@@ -10,11 +10,11 @@ const props = defineProps({
   showToast: { type: Function, default: null }
 })
 
-// Unified pool of comments (community + high frequency curated tips)
-const commentsPool = computed(() => {
+// Unified pool of comments
+const allComments = computed(() => {
   const globalList = danmakuStore.globalCommentsList.value || []
   return [...globalList, ...CURATED_PHYSICS_TIPS.map((tip, idx) => ({
-    id: `home-seed-${idx}`,
+    id: `seed-home-${idx}`,
     author: tip.author,
     message: tip.message,
     likes: tip.likes,
@@ -23,49 +23,37 @@ const commentsPool = computed(() => {
   }))]
 })
 
-// Staggered, irregular vertical lane tops (isomorphic with subject page)
-const laneTops = [40, 140, 245, 360, 485, 615, 750]
-const MAX_SLOTS = 7
-const CYCLE_DURATION = 15
+// 7 组错落有致的垂直泳道高度（不与考试局标题绑定，自然错开）
+const laneTops = [45, 155, 275, 400, 530, 660, 790]
 
-const activeSlots = ref([])
-const poolPointer = ref(0)
+// 每条泳道拥有独立的速度与交替的运行方向，形成无规律、不同步的灵动飘移感
+const laneConfigs = [
+  { dir: 'rtl', speed: 34, delay: 0 },
+  { dir: 'ltr', speed: 42, delay: -15 },
+  { dir: 'rtl', speed: 30, delay: -8 },
+  { dir: 'ltr', speed: 46, delay: -22 },
+  { dir: 'rtl', speed: 36, delay: -12 },
+  { dir: 'ltr', speed: 38, delay: -5 },
+  { dir: 'rtl', speed: 32, delay: -18 }
+]
 
-function initSlots() {
-  const list = commentsPool.value
+// 泳道分配的数据槽
+const laneItems = ref([[], [], [], [], [], [], []])
+
+function distributeComments() {
+  const list = allComments.value
   if (!list || list.length === 0) return
 
-  const count = Math.min(MAX_SLOTS, list.length)
-  const slots = []
-  for (let i = 0; i < count; i++) {
-    // Irregular staggered negative delays and varied durations so they don't form a line
-    const variedDuration = CYCLE_DURATION + (i % 3) * 2.5
-    const negativeDelay = -Number((i * (variedDuration / count) + (i % 2) * 1.5).toFixed(2))
-    slots.push({
-      slotId: `hslot-${i}-${Date.now()}`,
-      laneIndex: i,
-      item: list[i % list.length],
-      duration: variedDuration,
-      delay: negativeDelay,
-      isPaused: false
-    })
-  }
-  poolPointer.value = count - 1
-  activeSlots.value = slots
-}
+  const lanes = [[], [], [], [], [], [], []]
+  list.forEach((item, idx) => {
+    lanes[idx % 7].push(item)
+  })
 
-function onSlotIteration(sIdx) {
-  const list = commentsPool.value
-  if (!list || list.length <= MAX_SLOTS) return
-
-  if (activeSlots.value[sIdx]?.item) {
-    activeSlots.value[sIdx].item.liked = false
-  }
-
-  poolPointer.value = (poolPointer.value + 1) % list.length
-  if (activeSlots.value[sIdx]) {
-    activeSlots.value[sIdx].item = list[poolPointer.value]
-  }
+  // 保证每条泳道有至少 3 条数据实现平滑无缝循环
+  laneItems.value = lanes.map(arr => {
+    if (arr.length < 3) return [...arr, ...arr, ...arr]
+    return arr
+  })
 }
 
 // Fetch real comments from Supabase
@@ -96,9 +84,7 @@ async function fetchHomepageComments() {
   } catch (err) {
     console.warn('[HomeDanmaku] Failed to fetch comments:', err)
   } finally {
-    if (activeSlots.value.length === 0) {
-      initSlots()
-    }
+    distributeComments()
   }
 }
 
@@ -114,9 +100,8 @@ function formatTimeAgo(dateStr) {
 }
 
 watch(danmakuStore.latestGlobalComment, (newMsg) => {
-  if (newMsg && activeSlots.value.length > 0) {
-    // Instantly inject newly posted comment into the first slot
-    activeSlots.value[0].item = newMsg
+  if (newMsg) {
+    distributeComments()
   }
 })
 
@@ -124,115 +109,67 @@ function handleLike(item) {
   danmakuStore.toggleLike(item, client, props.showToast)
 }
 
+function onIteration(laneIdx) {
+  const lane = laneItems.value[laneIdx]
+  if (lane) {
+    lane.forEach(item => { item.liked = false })
+  }
+}
+
 onMounted(() => {
-  initSlots()
+  distributeComments()
   fetchHomepageComments()
 })
 </script>
 
 <template>
-  <div v-if="danmakuStore.danmakuEnabled.value && activeSlots.length > 0" class="home-portal-wrapper" aria-hidden="true">
-    <!-- 左侧留白舞台：从卡片左边缘穿出，向左外侧滑行 (完全同构于 subject 页面) -->
-    <div class="danmaku-portal-stage danmaku-stage-left">
+  <div v-if="danmakuStore.danmakuEnabled.value" class="home-ambient-stage" aria-hidden="true">
+    <!-- 7 条错落有致、横跨全页的浮动跑道 -->
+    <div 
+      v-for="(lane, lIdx) in laneItems" 
+      :key="'lane-' + lIdx"
+      class="danmaku-lane-row"
+      :style="{ top: `${laneTops[lIdx % laneTops.length]}px` }"
+    >
       <div 
-        v-for="(slot, sIdx) in activeSlots" 
-        :key="'left-' + slot.slotId"
-        class="danmaku-lane"
-        :style="{ top: `${laneTops[sIdx % laneTops.length]}px` }"
+        class="danmaku-marquee-track" 
+        :class="laneConfigs[lIdx].dir === 'rtl' ? 'track-dir-rtl' : 'track-dir-ltr'"
+        :style="{ 
+          animationDuration: `${laneConfigs[lIdx].speed}s`,
+          animationDelay: `${laneConfigs[lIdx].delay}s`
+        }"
+        @animationiteration="onIteration(lIdx)"
       >
         <div 
-          v-if="slot.item"
-          class="danmaku-runner-left"
-          :class="{ 'is-paused': slot.isPaused }"
-          :style="{ 
-            animationDuration: `${slot.duration}s`, 
-            animationDelay: `${slot.delay}s`
-          }"
-          @animationiteration="onSlotIteration(sIdx)"
+          v-for="(item, idx) in [...lane, ...lane]" 
+          :key="'item-' + lIdx + '-' + idx + '-' + item.id"
+          class="danmaku-capsule"
         >
-          <div 
-            class="danmaku-capsule"
-            @mouseenter="slot.isPaused = true"
-            @mouseleave="slot.isPaused = false"
-          >
-            <div class="danmaku-text-preview">
-              {{ slot.item.message }}
-            </div>
-
-            <!-- 悬停详情卡片 -->
-            <div class="danmaku-hover-card" @click.stop>
-              <div class="hover-card-header">
-                <span class="hover-tag">💬 {{ slot.item.author }}</span>
-                <span class="hover-time">{{ slot.item.time || '刚刚' }}</span>
-              </div>
-              <div class="hover-card-content">
-                {{ slot.item.message }}
-              </div>
-              <div class="hover-card-footer">
-                <button 
-                  type="button"
-                  class="hover-like-btn" 
-                  :class="{ 'is-liked': slot.item.liked }"
-                  @click.stop="handleLike(slot.item)"
-                  :title="slot.item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
-                >
-                  <span class="like-heart">{{ slot.item.liked ? '❤️' : '🤍' }}</span>
-                  <span class="like-num">{{ slot.item.likes || 0 }}</span>
-                </button>
-              </div>
-            </div>
+          <!-- 胶囊样式：与真题页完全一致 -->
+          <div class="danmaku-text-preview">
+            {{ item.message }}
           </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- 右侧留白舞台：从右外侧向左滑行，滑入卡片右边缘穿入 (完全同构于 subject 页面) -->
-    <div class="danmaku-portal-stage danmaku-stage-right">
-      <div 
-        v-for="(slot, sIdx) in activeSlots" 
-        :key="'right-' + slot.slotId"
-        class="danmaku-lane"
-        :style="{ top: `${laneTops[sIdx % laneTops.length]}px` }"
-      >
-        <div 
-          v-if="slot.item"
-          class="danmaku-runner-right"
-          :class="{ 'is-paused': slot.isPaused }"
-          :style="{ 
-            animationDuration: `${slot.duration}s`, 
-            animationDelay: `${slot.delay}s`
-          }"
-        >
-          <div 
-            class="danmaku-capsule"
-            @mouseenter="slot.isPaused = true"
-            @mouseleave="slot.isPaused = false"
-          >
-            <div class="danmaku-text-preview">
-              {{ slot.item.message }}
+          <!-- 悬停详情卡片 -->
+          <div class="danmaku-hover-card" @click.stop>
+            <div class="hover-card-header">
+              <span class="hover-tag">💬 {{ item.author }}</span>
+              <span class="hover-time">{{ item.time || '刚刚' }}</span>
             </div>
-
-            <!-- 悬停详情卡片 -->
-            <div class="danmaku-hover-card" @click.stop>
-              <div class="hover-card-header">
-                <span class="hover-tag">💡 {{ slot.item.author }}</span>
-                <span class="hover-time">{{ slot.item.time || '刚刚' }}</span>
-              </div>
-              <div class="hover-card-content">
-                {{ slot.item.message }}
-              </div>
-              <div class="hover-card-footer">
-                <button 
-                  type="button"
-                  class="hover-like-btn" 
-                  :class="{ 'is-liked': slot.item.liked }"
-                  @click.stop="handleLike(slot.item)"
-                  :title="slot.item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
-                >
-                  <span class="like-heart">{{ slot.item.liked ? '❤️' : '🤍' }}</span>
-                  <span class="like-num">{{ slot.item.likes || 0 }}</span>
-                </button>
-              </div>
+            <div class="hover-card-content">
+              {{ item.message }}
+            </div>
+            <div class="hover-card-footer">
+              <button 
+                type="button"
+                class="hover-like-btn" 
+                :class="{ 'is-liked': item.liked }"
+                @click.stop="handleLike(item)"
+                :title="item.liked ? (locale === 'zh' ? '已点赞' : 'Liked') : (locale === 'zh' ? '赞同' : 'Like')"
+              >
+                <span class="like-heart">{{ item.liked ? '❤️' : '🤍' }}</span>
+                <span class="like-num">{{ item.likes || 0 }}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -242,80 +179,68 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.home-portal-wrapper {
+.home-ambient-stage {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
-  right: 0;
-  pointer-events: none;
-}
-
-.danmaku-portal-stage {
-  position: absolute;
-  top: 0;
-  bottom: 0;
+  /* 横跨两侧留白与卡片空白空间，宽度为 100% + 580px */
+  left: -290px;
+  right: -290px;
   pointer-events: none;
   overflow: hidden;
-  z-index: 15;
+  /* 置于卡片 (z-index: 2) 下方，卡片实体与卡片间 16px 缝隙自然盖住弹幕 */
+  z-index: 1;
+  mask-image: linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%);
 }
 
-.danmaku-stage-left {
-  left: -290px;
-  width: 290px;
-}
-
-.danmaku-stage-right {
-  right: -290px;
-  width: 290px;
-}
-
-.danmaku-lane {
+.danmaku-lane-row {
   position: absolute;
   left: 0;
   right: 0;
   height: 40px;
+  white-space: nowrap;
   pointer-events: none;
 }
 
-.danmaku-runner-left,
-.danmaku-runner-right {
-  position: absolute;
-  top: 0;
-  pointer-events: auto;
+.danmaku-marquee-track {
+  display: inline-flex;
+  gap: 260px; /* 胶囊之间保持充足距离，错落有致，不扎堆 */
   white-space: nowrap;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+  pointer-events: none;
 }
 
-.danmaku-runner-right {
-  animation-name: flyRightVoid;
+.danmaku-lane-row:hover .danmaku-marquee-track {
+  animation-play-state: paused;
 }
 
-@keyframes flyRightVoid {
-  0% { transform: translateX(290px); }
-  100% { transform: translateX(-240px); }
+/* 贯穿左右留白与空白卡片区的完整平移动画 */
+.track-dir-rtl {
+  animation-name: flyRtlFullWidth;
 }
 
-.danmaku-runner-left {
-  animation-name: flyLeftVoid;
+.track-dir-ltr {
+  animation-name: flyLtrFullWidth;
 }
 
-@keyframes flyLeftVoid {
-  0% { transform: translateX(290px); }
-  100% { transform: translateX(-240px); }
+@keyframes flyRtlFullWidth {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
-.danmaku-runner-left.is-paused,
-.danmaku-runner-right.is-paused {
-  animation-play-state: paused !important;
-  z-index: 100 !important;
+@keyframes flyLtrFullWidth {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
 }
 
+/* 胶囊结构与样式（完全同构于 DanmakuStage.vue） */
 .danmaku-capsule {
   position: relative;
   display: inline-block;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .danmaku-text-preview {
@@ -333,15 +258,17 @@ onMounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   transition: all 0.16s ease;
+  user-select: none;
 }
 
 .danmaku-capsule:hover .danmaku-text-preview {
-  background: #fff;
+  background: #ffffff;
   border-color: var(--accent-primary);
   color: var(--accent-primary);
   box-shadow: 0 4px 12px rgba(255, 95, 64, 0.18);
 }
 
+/* 悬停详情卡片（z-index 提高到 200，确保悬停时高亮展示在所有元素之上） */
 .danmaku-hover-card {
   display: none;
   position: absolute;
@@ -354,9 +281,10 @@ onMounted(() => {
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(44, 47, 50, 0.12);
   padding: 10px 14px;
-  z-index: 999;
+  z-index: 200;
   white-space: normal;
   pointer-events: auto;
+  cursor: default;
 }
 
 .danmaku-capsule:hover .danmaku-hover-card {
@@ -425,8 +353,9 @@ onMounted(() => {
 }
 
 @media (max-width: 1200px) {
-  .danmaku-portal-stage {
-    display: none;
+  .home-ambient-stage {
+    left: 0;
+    right: 0;
   }
 }
 </style>
