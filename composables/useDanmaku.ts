@@ -27,6 +27,51 @@ export const MOCK_SUBQ_COMMENTS: Record<string, any[]> = {
   ]
 }
 
+// 丰富的各科目默认真题高频核心考点弹幕库
+export const CURATED_PHYSICS_TIPS = [
+  { author: 'Physics_Pro', message: '作图记得用直尺，斜率计算必须在图线上取相距一半以上的两点！', likes: 42, time: '8分钟前' },
+  { author: '考神附体', message: '单位换算要小心，注意题目给出的是 mm、cm 还是 m。', likes: 35, time: '15分钟前' },
+  { author: '林同学', message: '注意概念定义完整性，英文写清 rate of change of momentum。', likes: 28, time: '20分钟前' },
+  { author: 'Cambridge2024', message: '切线斜率表示瞬时加速度，图像面积表示总位移，别记反了！', likes: 39, time: '25分钟前' },
+  { author: '牛顿的小迷弟', message: '别漏掉重力势能变化，列能量守恒方程：Total Initial E = Total Final E。', likes: 31, time: '32分钟前' },
+  { author: 'Sarah_Astar', message: '有效数字 (Significant Figures) 严格与题目数据对齐，一般保留 2-3 位有效数字。', likes: 45, time: '40分钟前' },
+  { author: '电磁学小能手', message: '法拉第电磁感应定律 E = -N(ΔΦ/Δt)，别忘了匝数 N！', likes: 33, time: '45分钟前' },
+  { author: '刷题达人', message: '矢量题要明确指定正方向，标明大小与具体方向 (magnitude & direction)。', likes: 27, time: '1小时前' },
+  { author: 'BPhO选手', message: '推导题注意中间步骤，Mark Scheme 的 M 分和 A 分必须有明确因果链！', likes: 49, time: '1小时前' },
+  { author: '学霸小周', message: '简谐运动 SHM 加速度公式 a = -ω²x，负号一定不能丢！', likes: 36, time: '2小时前' }
+]
+
+// 确保每个题目的默认题目都有丰富生动的弹幕数据
+export function getQuestionSeedComments(rawNum: string = '', questionId: any = ''): any[] {
+  const key = String(rawNum).trim()
+  if (MOCK_SUBQ_COMMENTS[key] && MOCK_SUBQ_COMMENTS[key].length > 0) {
+    return MOCK_SUBQ_COMMENTS[key]
+  }
+
+  let hash = 0
+  const str = String(questionId || rawNum || 'default')
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i)
+    hash |= 0
+  }
+  const offset = Math.abs(hash) % CURATED_PHYSICS_TIPS.length
+
+  const selected = []
+  for (let i = 0; i < 4; i++) {
+    const tip = CURATED_PHYSICS_TIPS[(offset + i) % CURATED_PHYSICS_TIPS.length]
+    selected.push({
+      id: `seed-${str}-${i}`,
+      author: tip.author,
+      message: tip.message,
+      likes: tip.likes,
+      time: tip.time,
+      isMock: true,
+      liked: false
+    })
+  }
+  return selected
+}
+
 export function checkIsLiked(commentId: string | number): boolean {
   if (typeof window === 'undefined') return false
   return localStorage.getItem(`danmaku_like_${commentId}`) === 'true'
@@ -110,30 +155,20 @@ export function useDanmaku() {
     }
   }
 
-  // 跨端双向匿名点赞：飘走前可撤回反悔，飘走后固化
+  // 跨端双向匿名点赞：直接调用 Supabase 原子 RPC 函数
   async function syncLikeDelta(commentId: string | number, delta: number, client: any) {
     if (!commentId || !client) return
-    if (String(commentId).startsWith('mock-') || String(commentId).startsWith('hc-') || String(commentId).startsWith('local-')) {
+    if (String(commentId).startsWith('mock-') || String(commentId).startsWith('hc-') || String(commentId).startsWith('local-') || String(commentId).startsWith('seed-')) {
       return
     }
     const numericId = Number(commentId)
     if (isNaN(numericId)) return
 
     try {
-      // 优先调用 Supabase 原子函数（安全无竞争、免RLS权限障碍）
-      const { error: rpcErr } = await client.rpc('increment_comment_like', {
+      await client.rpc('increment_comment_like', {
         c_id: numericId,
         delta: delta
       })
-
-      if (rpcErr) {
-        // 容错回退机制：若数据库未执行函数脚本，直接单行更新
-        const { data } = await client.from('comments').select('likes').eq('id', numericId).single()
-        const current = data?.likes || 0
-        await client.from('comments').update({
-          likes: Math.max(0, current + delta)
-        }).eq('id', numericId)
-      }
     } catch (err) {
       console.warn('[Danmaku] Failed to sync like delta:', err)
     }

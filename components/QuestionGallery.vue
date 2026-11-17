@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useFavorites, getItemSubject } from '~/composables/useFavorites'
 import { useQuestionSearch } from '~/composables/useQuestionSearch'
-import { useDanmaku, MOCK_SUBQ_COMMENTS, checkIsLiked } from '~/composables/useDanmaku'
+import { useDanmaku, getQuestionSeedComments } from '~/composables/useDanmaku'
 import { useImageStitcher } from '~/composables/useImageStitcher'
 import { usePdfExport } from '~/composables/usePdfExport'
 import { getSubjectSeedQuestion } from '~/composables/useSeedQuestion'
@@ -181,25 +181,42 @@ const filteredFavoriteItems = computed(() => {
 
 // Danmaku computed stream for current question
 const allDanmakuList = computed(() => {
-  if (!danmakuStore.danmakuEnabled.value || groupQuestions.value.length === 0) return []
+  if (!danmakuStore.danmakuEnabled.value) return []
+
+  const targetGroups = groupQuestions.value.length > 0 
+    ? groupQuestions.value 
+    : (currentStreamQuestions.value.length > 0 ? currentStreamQuestions.value.slice(0, 3) : [])
+
+  if (targetGroups.length === 0) return []
+
   const list = []
-  groupQuestions.value.forEach(subQ => {
-    const comments = subQComments.value[subQ.id] || []
-    comments.forEach(c => {
-      list.push({
-        id: c.id,
-        subQId: subQ.id,
-        qnum: subQ.question_raw_number,
-        author: c.profiles?.display_name || c.author || '做题同学',
-        message: c.message,
-        time: c.time || '刚刚',
-        likes: c.likes || 0,
-        liked: c.liked || false
+  targetGroups.forEach(item => {
+    const subs = (item.subQuestions && item.subQuestions.length > 0) ? item.subQuestions : [item]
+    subs.forEach(subQ => {
+      const comments = subQComments.value[subQ.id] || getQuestionSeedComments(subQ.question_raw_number, subQ.id)
+      comments.forEach(c => {
+        list.push({
+          id: c.id,
+          subQId: subQ.id,
+          qnum: subQ.question_raw_number || (subQ.paper_type === 'MCQ' ? `Q${subQ.question_raw_number || '1'}` : 'Q1'),
+          author: c.profiles?.display_name || c.author || '考友',
+          message: c.message,
+          time: c.time || '刚刚',
+          likes: c.likes || 0,
+          liked: c.liked || false
+        })
       })
     })
   })
   return list
 })
+
+// 自动侦听弹幕数据变化，实时向左右两侧弹幕跑道装填数据
+watch(allDanmakuList, (newList) => {
+  if (newList && newList.length > 0) {
+    danmakuStore.initDanmakuSlots(newList)
+  }
+}, { immediate: true })
 
 // Favorite Status Helpers
 const isWholeSqFav = computed(() => {
@@ -228,6 +245,14 @@ const subQCommentsCache = new Map()
 let commentsDebounceTimer = null
 
 function queueFetchComments(questions) {
+  // 立即在前端同步注入种子考点弹幕，确保首帧 0ms 即刻有弹幕浮动
+  questions.forEach(sub => {
+    if (!subQComments.value[sub.id]) {
+      const seedList = getQuestionSeedComments(sub.question_raw_number, sub.id)
+      subQComments.value[sub.id] = seedList
+    }
+  })
+
   if (commentsDebounceTimer) clearTimeout(commentsDebounceTimer)
   commentsDebounceTimer = setTimeout(() => {
     questions.forEach(sub => {
@@ -285,26 +310,17 @@ async function fetchSubQComments(subQId, rawNum = '') {
 
     const dbComments = (!error && data) ? data.map(c => ({
       ...c,
-      liked: checkIsLiked(c.id)
+      author: c.profiles?.display_name || '考友',
+      liked: false
     })) : []
 
-    const seedKey = String(rawNum).trim()
-    const mockList = (MOCK_SUBQ_COMMENTS[seedKey] || MOCK_SUBQ_COMMENTS['default'] || []).map(m => ({
-      ...m,
-      isMock: true,
-      liked: checkIsLiked(m.id)
-    }))
-
-    const combined = [...mockList, ...dbComments]
+    const seedList = getQuestionSeedComments(rawNum, subQId)
+    const combined = [...dbComments, ...seedList]
     subQCommentsCache.set(subQId, combined)
     subQComments.value[subQId] = combined
   } catch (err) {
     console.error('Error fetching subQ comments:', err)
-    const fallback = (MOCK_SUBQ_COMMENTS['default'] || []).map(m => ({
-      ...m,
-      isMock: true,
-      liked: checkIsLiked(m.id)
-    }))
+    const fallback = getQuestionSeedComments(rawNum, subQId)
     subQCommentsCache.set(subQId, fallback)
     subQComments.value[subQId] = fallback
   }
@@ -611,12 +627,21 @@ watch(selectedPaper, (paper) => {
 
 async function initSubject(seriesId) {
   poolStore.initSeedPool(seriesId)
+  if (poolStore.groupedQuestions.value.length > 0) {
+    displayGroup(poolStore.groupedQuestions.value[0])
+  }
   // Warm up search catalog in background
   searchStore.warmUpCatalog(seriesId)
 
   // Load subject pool in background: reads from local IndexedDB in ~2-4ms, or parallel fast fetch
   poolStore.loadSubjectPool(seriesId)
 }
+
+watch(poolStore.groupedQuestions, (newGrouped) => {
+  if (newGrouped && newGrouped.length > 0 && !currentQuestionData.value) {
+    displayGroup(newGrouped[0])
+  }
+})
 
 watch(() => props.subjectId, async (newSubject) => {
   selectedPaper.value = ''
