@@ -32,14 +32,45 @@ export function checkIsLiked(commentId: string | number): boolean {
   return localStorage.getItem(`danmaku_like_${commentId}`) === 'true'
 }
 
+// Global shared danmaku visibility state
+const danmakuEnabled = ref(true)
+let isDanmakuPrefInitialized = false
+
+export function initDanmakuPreference() {
+  if (typeof window === 'undefined' || isDanmakuPrefInitialized) return
+  isDanmakuPrefInitialized = true
+  const saved = localStorage.getItem('physics_danmaku_enabled')
+  if (saved !== null) {
+    danmakuEnabled.value = saved !== 'false'
+  }
+}
+
+export function toggleDanmakuGlobal() {
+  initDanmakuPreference()
+  danmakuEnabled.value = !danmakuEnabled.value
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('physics_danmaku_enabled', String(danmakuEnabled.value))
+  }
+  return danmakuEnabled.value
+}
+
 export function useDanmaku() {
   const { t, locale } = useI18n()
-  const danmakuEnabled = ref(true)
+  initDanmakuPreference()
+  
   const MAX_DANMAKU_DISPLAY = 5
   const laneTops = [80, 165, 250, 335, 420]
   const activeSlots = ref<any[]>([])
   const poolPointer = ref(0)
   const CYCLE_DURATION = 14
+
+  function toggleDanmaku() {
+    const val = toggleDanmakuGlobal()
+    if (!val) {
+      activeSlots.value = []
+    }
+    return val
+  }
 
   function initDanmakuSlots(list: any[]) {
     if (!danmakuEnabled.value || !list || list.length === 0) {
@@ -111,6 +142,7 @@ export function useDanmaku() {
 
   return {
     danmakuEnabled,
+    toggleDanmaku,
     MAX_DANMAKU_DISPLAY,
     laneTops,
     activeSlots,

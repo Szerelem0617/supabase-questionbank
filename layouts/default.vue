@@ -3,6 +3,7 @@ const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { profile, fetchProfile } = useUserProfile()
 const { locale, toggleLocale, t } = useI18n()
+const danmakuStore = useDanmaku()
 const isHelpModalOpen = ref(false)
 
 // Fetch profile whenever user is logged in
@@ -35,6 +36,30 @@ async function signOut() {
         </div>
         
         <div class="nav-actions">
+          <!-- 弹幕全站开关按钮 (高度 34px, 圆角 8px) -->
+          <button 
+            type="button" 
+            class="danmaku-switch-btn" 
+            :class="{ 'is-off': !danmakuStore.danmakuEnabled.value }"
+            @click="danmakuStore.toggleDanmaku"
+            :title="danmakuStore.danmakuEnabled.value 
+              ? (locale === 'zh' ? '全站弹幕: 已开启 (点击关闭)' : 'Danmaku: ON (Click to turn off)') 
+              : (locale === 'zh' ? '全站弹幕: 已关闭 (点击开启)' : 'Danmaku: OFF (Click to turn on)')"
+          >
+            <svg v-if="danmakuStore.danmakuEnabled.value" class="danmaku-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              <path d="M8 10h.01M12 10h.01M16 10h.01" />
+            </svg>
+            <svg v-else class="danmaku-nav-icon is-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              <line x1="2" y1="2" x2="22" y2="22" />
+            </svg>
+            <span class="danmaku-nav-text">{{ locale === 'zh' ? '弹幕' : 'Danmaku' }}</span>
+            <span class="danmaku-nav-pill" :class="{ 'pill-on': danmakuStore.danmakuEnabled.value }">
+              {{ danmakuStore.danmakuEnabled.value ? (locale === 'zh' ? '开' : 'ON') : (locale === 'zh' ? '关' : 'OFF') }}
+            </span>
+          </button>
+
           <!-- 帮助与功能提示按钮 (i) -->
           <button 
             type="button" 
@@ -155,6 +180,72 @@ async function signOut() {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.danmaku-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.16s ease;
+  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.03);
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.danmaku-switch-btn:hover {
+  background: var(--bg-surface-subtle);
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.danmaku-switch-btn.is-off {
+  opacity: 0.65;
+  background: var(--bg-surface-subtle);
+  color: var(--text-muted);
+}
+
+.danmaku-nav-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--accent-primary);
+  flex-shrink: 0;
+  display: block;
+}
+
+.danmaku-nav-icon.is-muted {
+  color: var(--text-muted);
+}
+
+.danmaku-nav-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.danmaku-switch-btn.is-off .danmaku-nav-text {
+  color: var(--text-muted);
+}
+
+.danmaku-nav-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(44, 47, 50, 0.08);
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.danmaku-nav-pill.pill-on {
+  background: var(--accent-primary-light);
+  color: var(--accent-primary);
 }
 
 .help-info-btn {

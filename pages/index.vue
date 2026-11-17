@@ -1,5 +1,14 @@
 <script setup>
-const { t } = useI18n()
+import HomeDanmakuStage from '~/components/home/HomeDanmakuStage.vue'
+import HomeCommentModal from '~/components/home/HomeCommentModal.vue'
+
+const { t, locale } = useI18n()
+const isCommentModalOpen = ref(false)
+const latestPostedMessage = ref(null)
+
+function onMessagePosted(msg) {
+  latestPostedMessage.value = msg
+}
 
 // 1. CAIE (剑桥体系)
 const caieSubjects = [
@@ -70,7 +79,31 @@ useSeoMeta({
       <p class="hero-subtitle">
         {{ t('home.subtitlePrefix') }}<strong>{{ t('home.subtitleQuestions') }}</strong>{{ t('home.subtitleSuffix') }}
       </p>
+
+      <!-- 首页功能区：互动留言与发送弹幕入口 -->
+      <div class="hero-actions">
+        <button 
+          type="button" 
+          class="btn-hero-danmaku" 
+          @click="isCommentModalOpen = true"
+          :title="locale === 'zh' ? '在首页或题库发布弹幕留言' : 'Post community danmaku message'"
+        >
+          <span class="bhd-icon">💬</span>
+          <span class="bhd-text">{{ locale === 'zh' ? '考友交流留言 · 实时弹幕上墙' : 'Community Board · Post Live Danmaku' }}</span>
+          <span class="bhd-badge">{{ locale === 'zh' ? '发条弹幕' : 'Post' }} &rarr;</span>
+        </button>
+      </div>
     </div>
+
+    <!-- 首页全景浮动弹幕舞台 (支持顶部栏全站开关控制) -->
+    <HomeDanmakuStage :newlyPostedMessage="latestPostedMessage" />
+
+    <!-- 留言弹幕弹窗 -->
+    <HomeCommentModal 
+      :isOpen="isCommentModalOpen" 
+      @close="isCommentModalOpen = false" 
+      @message-posted="onMessagePosted" 
+    />
 
     <!-- Four Distinct Sections: CAIE -> EDX -> AQA -> Olympiad -->
     <div 
@@ -147,6 +180,60 @@ useSeoMeta({
 .hero-subtitle strong {
   color: var(--accent-primary);
   font-weight: 700;
+}
+
+.hero-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.btn-hero-danmaku {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px 0 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(44, 47, 50, 0.05);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.btn-hero-danmaku:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 14px rgba(194, 65, 40, 0.14);
+}
+
+.bhd-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.bhd-text {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.bhd-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  background: var(--accent-primary-light);
+  padding: 2px 8px;
+  border-radius: 10px;
+  transition: background 0.15s ease;
+}
+
+.btn-hero-danmaku:hover .bhd-badge {
+  background: var(--accent-primary);
+  color: #ffffff;
 }
 
 .spec-section {
