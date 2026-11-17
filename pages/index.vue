@@ -216,14 +216,14 @@ useSeoMeta({
   box-shadow: 0 2px 8px rgba(204, 160, 76, 0.16), 0 1px 3px rgba(44, 47, 50, 0.04);
 }
 
-/* 实体遮蔽相邻卡片之间的 16px 夹缝：从卡片外侧 +1px 处延伸 16px，严丝合缝封堵缝隙，绝无漏光 */
-.subject-card:not(:last-child)::after {
+/* 实体遮蔽相邻卡片之间的 16px 夹缝：从卡片外侧 +1px 处延伸 18px，严丝合缝封堵缝隙，绝无漏光 */
+.subject-card:not(:nth-child(4n)):not(:last-child)::after {
   content: '';
   position: absolute;
-  top: -4px;
-  bottom: -4px;
+  top: -6px;
+  bottom: -6px;
   left: calc(100% + 1px);
-  width: 16px;
+  width: 18px;
   background: var(--bg-canvas);
   pointer-events: none;
   z-index: 1;

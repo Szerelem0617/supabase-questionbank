@@ -144,13 +144,26 @@ onMounted(() => {
           v-for="(item, idx) in [...lane, ...lane]" 
           :key="'item-' + lIdx + '-' + idx + '-' + item.id"
           class="danmaku-capsule"
+          :class="{ 'is-liked': item.liked }"
+          @click.stop="handleLike(item)"
+          :title="item.liked ? (locale === 'zh' ? '点击取消点赞' : 'Click to unlike') : (locale === 'zh' ? '点击直接点赞' : 'Click to like')"
         >
-          <!-- 胶囊样式：与真题页完全一致 -->
+          <!-- 胶囊样式：包含弹幕文本与悬停时无需移动鼠标即可直点的点赞按钮 -->
           <div class="danmaku-text-preview">
-            {{ item.message }}
+            <span class="preview-text">{{ item.message }}</span>
+            <button 
+              type="button" 
+              class="capsule-like-btn" 
+              :class="{ 'is-liked': item.liked }"
+              @click.stop="handleLike(item)"
+              :title="item.liked ? (locale === 'zh' ? '取消点赞' : 'Unlike') : (locale === 'zh' ? '点赞' : 'Like')"
+            >
+              <span class="like-heart">{{ item.liked ? '❤️' : '🤍' }}</span>
+              <span class="like-num">{{ item.likes || 0 }}</span>
+            </button>
           </div>
 
-          <!-- 悬停详情卡片 -->
+          <!-- 悬停详情卡片：展示留言者、时间与完整内容 -->
           <div class="danmaku-hover-card" @click.stop>
             <div class="hover-card-header">
               <span class="hover-tag">💬 {{ item.author }}</span>
@@ -235,7 +248,7 @@ onMounted(() => {
   100% { transform: translateX(0); }
 }
 
-/* 胶囊结构与样式（完全同构于 DanmakuStage.vue） */
+/* 胶囊结构与样式（完全同构于 DanmakuStage.vue 与 SearchDanmakuStage.vue） */
 .danmaku-capsule {
   position: relative;
   display: inline-block;
@@ -244,8 +257,10 @@ onMounted(() => {
 }
 
 .danmaku-text-preview {
-  display: inline-block;
-  padding: 4px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 14px;
   border-radius: 20px;
   font-size: 0.82rem;
   font-weight: 600;
@@ -253,19 +268,62 @@ onMounted(() => {
   background: #fdfaf6;
   border: 1px solid #dfdbd4;
   box-shadow: 0 2px 6px rgba(44, 47, 50, 0.06);
-  max-width: 220px;
+  max-width: 260px;
+  transition: all 0.16s ease;
+  user-select: none;
+}
+
+.preview-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: all 0.16s ease;
-  user-select: none;
+  max-width: 170px;
+}
+
+/* 胶囊内置点赞按钮：位于悬停时光标正下方，零位移即刻点赞/取消 */
+.capsule-like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 1px 6px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.capsule-like-btn:hover {
+  background: rgba(224, 36, 94, 0.12);
+  color: #e0245e;
+  transform: scale(1.08);
+}
+
+.capsule-like-btn.is-liked {
+  background: rgba(224, 36, 94, 0.12);
+  color: #e0245e;
+  font-weight: 700;
+  border-color: rgba(224, 36, 94, 0.3);
+}
+
+.capsule-like-btn .like-heart {
+  font-size: 0.72rem;
+  transition: transform 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.capsule-like-btn.is-liked .like-heart {
+  transform: scale(1.18);
 }
 
 .danmaku-capsule:hover .danmaku-text-preview {
   background: #ffffff;
   border-color: var(--accent-primary);
   color: var(--accent-primary);
-  box-shadow: 0 4px 12px rgba(255, 95, 64, 0.18);
+  box-shadow: 0 4px 14px rgba(255, 95, 64, 0.18);
 }
 
 /* 悬停详情卡片（z-index 提高到 200，确保悬停时高亮展示在所有元素之上） */

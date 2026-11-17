@@ -80,15 +80,28 @@ function onIteration(laneGroup, laneIdx) {
             v-for="(item, idx) in [...leftLanes[0], ...leftLanes[0]]" 
             :key="'sl0-' + idx + '-' + item.id"
             class="danmaku-capsule"
+            :class="{ 'is-liked': item.liked }"
+            @click.stop="handleLike(item)"
+            :title="item.liked ? (locale === 'zh' ? '点击取消点赞' : 'Click to unlike') : (locale === 'zh' ? '点击直接点赞' : 'Click to like')"
           >
             <div class="danmaku-text-preview">
               <span class="preview-dot"></span>
-              {{ item.message }}
+              <span class="preview-text">{{ item.message }}</span>
+              <button 
+                type="button" 
+                class="capsule-like-btn" 
+                :class="{ 'is-liked': item.liked }"
+                @click.stop="handleLike(item)"
+                :title="item.liked ? (locale === 'zh' ? '取消点赞' : 'Unlike') : (locale === 'zh' ? '点赞' : 'Like')"
+              >
+                <span class="like-heart">{{ item.liked ? '❤️' : '🤍' }}</span>
+                <span class="like-num">{{ item.likes || 0 }}</span>
+              </button>
             </div>
 
             <div class="danmaku-hover-card" @click.stop>
               <div class="hover-card-header">
-                <span class="hover-tag">💡 {{ item.author }}</span>
+                <span class="hover-tag">💬 {{ item.author }}</span>
                 <span class="hover-time">{{ item.time || '刚刚' }}</span>
               </div>
               <div class="hover-card-content">
@@ -118,10 +131,23 @@ function onIteration(laneGroup, laneIdx) {
             v-for="(item, idx) in [...leftLanes[1], ...leftLanes[1]]" 
             :key="'sl1-' + idx + '-' + item.id"
             class="danmaku-capsule"
+            :class="{ 'is-liked': item.liked }"
+            @click.stop="handleLike(item)"
+            :title="item.liked ? (locale === 'zh' ? '点击取消点赞' : 'Click to unlike') : (locale === 'zh' ? '点击直接点赞' : 'Click to like')"
           >
             <div class="danmaku-text-preview">
               <span class="preview-dot"></span>
-              {{ item.message }}
+              <span class="preview-text">{{ item.message }}</span>
+              <button 
+                type="button" 
+                class="capsule-like-btn" 
+                :class="{ 'is-liked': item.liked }"
+                @click.stop="handleLike(item)"
+                :title="item.liked ? (locale === 'zh' ? '取消点赞' : 'Unlike') : (locale === 'zh' ? '点赞' : 'Like')"
+              >
+                <span class="like-heart">{{ item.liked ? '❤️' : '🤍' }}</span>
+                <span class="like-num">{{ item.likes || 0 }}</span>
+              </button>
             </div>
 
             <div class="danmaku-hover-card" @click.stop>
@@ -159,15 +185,28 @@ function onIteration(laneGroup, laneIdx) {
             v-for="(item, idx) in [...rightLanes[0], ...rightLanes[0]]" 
             :key="'sr0-' + idx + '-' + item.id"
             class="danmaku-capsule"
+            :class="{ 'is-liked': item.liked }"
+            @click.stop="handleLike(item)"
+            :title="item.liked ? (locale === 'zh' ? '点击取消点赞' : 'Click to unlike') : (locale === 'zh' ? '点击直接点赞' : 'Click to like')"
           >
             <div class="danmaku-text-preview">
               <span class="preview-dot"></span>
-              {{ item.message }}
+              <span class="preview-text">{{ item.message }}</span>
+              <button 
+                type="button" 
+                class="capsule-like-btn" 
+                :class="{ 'is-liked': item.liked }"
+                @click.stop="handleLike(item)"
+                :title="item.liked ? (locale === 'zh' ? '取消点赞' : 'Unlike') : (locale === 'zh' ? '点赞' : 'Like')"
+              >
+                <span class="like-heart">{{ item.liked ? '❤️' : '🤍' }}</span>
+                <span class="like-num">{{ item.likes || 0 }}</span>
+              </button>
             </div>
 
             <div class="danmaku-hover-card" @click.stop>
               <div class="hover-card-header">
-                <span class="hover-tag">⚡ {{ item.author }}</span>
+                <span class="hover-tag">💬 {{ item.author }}</span>
                 <span class="hover-time">{{ item.time || '刚刚' }}</span>
               </div>
               <div class="hover-card-content">
@@ -197,15 +236,28 @@ function onIteration(laneGroup, laneIdx) {
             v-for="(item, idx) in [...rightLanes[1], ...rightLanes[1]]" 
             :key="'sr1-' + idx + '-' + item.id"
             class="danmaku-capsule"
+            :class="{ 'is-liked': item.liked }"
+            @click.stop="handleLike(item)"
+            :title="item.liked ? (locale === 'zh' ? '点击取消点赞' : 'Click to unlike') : (locale === 'zh' ? '点击直接点赞' : 'Click to like')"
           >
             <div class="danmaku-text-preview">
               <span class="preview-dot"></span>
-              {{ item.message }}
+              <span class="preview-text">{{ item.message }}</span>
+              <button 
+                type="button" 
+                class="capsule-like-btn" 
+                :class="{ 'is-liked': item.liked }"
+                @click.stop="handleLike(item)"
+                :title="item.liked ? (locale === 'zh' ? '取消点赞' : 'Unlike') : (locale === 'zh' ? '点赞' : 'Like')"
+              >
+                <span class="like-heart">{{ item.liked ? '❤️' : '🤍' }}</span>
+                <span class="like-num">{{ item.likes || 0 }}</span>
+              </button>
             </div>
 
             <div class="danmaku-hover-card" @click.stop>
               <div class="hover-card-header">
-                <span class="hover-tag">✨ {{ item.author }}</span>
+                <span class="hover-tag">💬 {{ item.author }}</span>
                 <span class="hover-time">{{ item.time || '刚刚' }}</span>
               </div>
               <div class="hover-card-content">
@@ -327,7 +379,7 @@ function onIteration(laneGroup, laneIdx) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 13px 4px 10px;
+  padding: 4px 8px 4px 10px;
   border-radius: 20px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -337,12 +389,55 @@ function onIteration(laneGroup, laneIdx) {
   -webkit-backdrop-filter: blur(6px);
   border: 1px solid rgba(220, 215, 206, 0.9);
   box-shadow: 0 2px 6px rgba(44, 47, 50, 0.05);
-  max-width: 200px;
+  max-width: 250px;
+  transition: all 0.16s ease;
+  user-select: none;
+}
+
+.preview-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: all 0.16s ease;
-  user-select: none;
+  max-width: 155px;
+}
+
+/* 胶囊内置点赞按钮：位于悬停时光标正下方，零位移即刻点赞/取消 */
+.capsule-like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 1px 6px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.capsule-like-btn:hover {
+  background: rgba(224, 36, 94, 0.12);
+  color: #e0245e;
+  transform: scale(1.08);
+}
+
+.capsule-like-btn.is-liked {
+  background: rgba(224, 36, 94, 0.12);
+  color: #e0245e;
+  font-weight: 700;
+  border-color: rgba(224, 36, 94, 0.3);
+}
+
+.capsule-like-btn .like-heart {
+  font-size: 0.72rem;
+  transition: transform 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.capsule-like-btn.is-liked .like-heart {
+  transform: scale(1.18);
 }
 
 .preview-dot {
