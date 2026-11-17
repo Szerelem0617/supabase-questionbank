@@ -205,29 +205,28 @@ useSeoMeta({
   display: flex;
   flex-direction: column;
   background: var(--bg-surface);
-  /* 搜题同款常驻金线：不悬停时亦常驻显现金线轮廓与温暖光晕，彻底清晰定界 */
-  border: 2px solid #f59e0b !important;
+  /* 搜题同款常驻金线：常态全时显现，清晰定界，温暖典雅 */
+  border: 2px solid #f59e0b;
   border-radius: 12px;
   padding: 16px 16px 14px;
   text-decoration: none;
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   z-index: 2;
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35), 0 2px 6px rgba(44, 47, 50, 0.05) !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35), 0 2px 6px rgba(44, 47, 50, 0.05);
 }
 
-/* 实体遮蔽相邻卡片之间的 16px 夹缝，让卡片实体与夹缝连成整体遮挡弹幕，避免在窄缝露馅 */
-.subject-card::before {
+/* 实体遮蔽相邻卡片之间的 16px 夹缝，让同排卡片在视觉上平滑阻隔弹幕，绝不覆盖卡片自身边框与阴影 */
+.subject-card::after {
   content: '';
   position: absolute;
-  top: -9px;
-  bottom: -9px;
-  left: -9px;
-  right: -9px;
+  top: 0;
+  bottom: 0;
+  right: -16px;
+  width: 16px;
   background: var(--bg-canvas);
-  z-index: -1;
   pointer-events: none;
-  border-radius: 6px;
+  z-index: 1;
 }
 
 .subject-card:hover {
