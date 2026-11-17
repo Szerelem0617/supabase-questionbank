@@ -4,7 +4,7 @@ const { t, locale } = useI18n()
 const props = defineProps({
   activeSlots: { type: Array, default: () => [] },
   laneTops: { type: Array, default: () => [80, 165, 250, 335, 420] },
-  danmakuEnabled: { type: Boolean, default: true },
+  danmakuEnabled: { type: Boolean, default: false },
   hasDanmaku: { type: Boolean, default: false }
 })
 

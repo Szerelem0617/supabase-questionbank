@@ -89,8 +89,8 @@ export function checkIsLiked(commentId: string | number): boolean {
   return localStorage.getItem(`danmaku_like_${commentId}`) === 'true'
 }
 
-// Global shared danmaku visibility state & modal triggers
-const danmakuEnabled = ref(true)
+// Global shared danmaku visibility state & modal triggers (默认关闭)
+const danmakuEnabled = ref(false)
 let isDanmakuPrefInitialized = false
 
 // 全局留言弹窗状态与即时广播总线
@@ -117,7 +117,9 @@ export function initDanmakuPreference() {
   isDanmakuPrefInitialized = true
   const saved = localStorage.getItem('physics_danmaku_enabled')
   if (saved !== null) {
-    danmakuEnabled.value = saved !== 'false'
+    danmakuEnabled.value = saved === 'true'
+  } else {
+    danmakuEnabled.value = false
   }
 }
 
