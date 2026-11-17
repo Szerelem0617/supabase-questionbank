@@ -182,9 +182,14 @@ useSeoMeta({
   font-family: var(--font-serif);
   font-size: 1.35rem;
   color: var(--text-main);
-  margin: 0;
+  margin: -4px 0;
+  padding: 4px 18px 4px 0;
   font-weight: 700;
   letter-spacing: -0.01em;
+  display: inline-block;
+  background: var(--bg-canvas);
+  position: relative;
+  z-index: 3;
 }
 
 .subject-grid {
