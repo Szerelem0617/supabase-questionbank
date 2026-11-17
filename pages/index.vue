@@ -175,21 +175,22 @@ useSeoMeta({
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border-color);
   position: relative;
-  z-index: 2;
+  z-index: 3;
 }
 
 .section-title {
   font-family: var(--font-serif);
   font-size: 1.35rem;
   color: var(--text-main);
-  margin: -4px 0;
-  padding: 4px 18px 4px 0;
+  margin: -6px 0 -6px -12px;
+  padding: 6px 20px 6px 12px;
   font-weight: 700;
   letter-spacing: -0.01em;
   display: inline-block;
   background: var(--bg-canvas);
   position: relative;
-  z-index: 3;
+  z-index: 4;
+  border-radius: 6px;
 }
 
 .subject-grid {
@@ -204,14 +205,15 @@ useSeoMeta({
   display: flex;
   flex-direction: column;
   background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
+  /* 显式精装典籍边界线：清晰定义卡片轮廓，兼顾学术克制美学 */
+  border: 1px solid #d4cbb8;
+  border-radius: 12px;
   padding: 16px 16px 14px;
   text-decoration: none;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   z-index: 2;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(44, 47, 50, 0.05), 0 1px 2px rgba(44, 47, 50, 0.03);
 }
 
 /* 实体遮蔽相邻卡片之间的 16px 夹缝，让卡片实体与夹缝连成整体遮挡弹幕，避免在窄缝露馅 */
@@ -231,7 +233,7 @@ useSeoMeta({
 .subject-card:hover {
   transform: translateY(-2px);
   border-color: var(--accent-primary);
-  box-shadow: 0 8px 20px rgba(184, 80, 56, 0.12);
+  box-shadow: 0 8px 24px rgba(194, 65, 40, 0.12), 0 2px 6px rgba(194, 65, 40, 0.06);
 }
 
 .card-top {
