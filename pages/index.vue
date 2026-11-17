@@ -205,15 +205,15 @@ useSeoMeta({
   display: flex;
   flex-direction: column;
   background: var(--bg-surface);
-  /* 典雅烫金金线边框：完美呼应搜题高亮金线，清晰定义卡片边界 */
-  border: 1.5px solid #d49a24;
+  /* 搜题同款常驻金线：不悬停时亦常驻显现金线轮廓与温暖光晕，彻底清晰定界 */
+  border: 2px solid #f59e0b;
   border-radius: 12px;
   padding: 16px 16px 14px;
   text-decoration: none;
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   z-index: 2;
-  box-shadow: 0 0 0 1px rgba(212, 154, 36, 0.15), 0 3px 12px rgba(212, 154, 36, 0.12), 0 1px 3px rgba(44, 47, 50, 0.04);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.32), 0 2px 6px rgba(44, 47, 50, 0.05);
 }
 
 /* 实体遮蔽相邻卡片之间的 16px 夹缝，让卡片实体与夹缝连成整体遮挡弹幕，避免在窄缝露馅 */
@@ -232,8 +232,8 @@ useSeoMeta({
 
 .subject-card:hover {
   transform: translateY(-2px);
-  border-color: #b45309;
-  box-shadow: 0 0 14px rgba(245, 158, 11, 0.4), 0 8px 24px rgba(180, 83, 9, 0.18);
+  border-color: #d97706;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.55), 0 8px 24px rgba(180, 83, 9, 0.2);
 }
 
 .card-top {
