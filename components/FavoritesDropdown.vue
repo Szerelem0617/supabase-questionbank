@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useFavorites } from '~/composables/useFavorites'
+import { useFavorites, getItemSubject } from '~/composables/useFavorites'
 import { usePdfExport } from '~/composables/usePdfExport'
+import { ALL_SUBJECTS, getSubjectById } from '~/composables/useSubjects'
 
 const { t, locale } = useI18n()
 const user = useSupabaseUser()
@@ -18,6 +19,48 @@ const isCreatingFolder = ref(false)
 const exportMenuFolderId = ref(null)
 const newFolderName = ref('')
 const favDropdownRef = ref(null)
+const isScopePickerOpen = ref(false)
+
+// 当前收藏夹科目过滤范围
+const currentScope = computed(() => {
+  const scopeId = favoritesStore.targetSubjectScope.value
+  if (!scopeId || scopeId === 'ALL') return null
+  return getSubjectById(scopeId)
+})
+
+const currentScopeDisplayName = computed(() => {
+  if (currentScope.value) {
+    return currentScope.value.shortName || currentScope.value.name
+  }
+  return locale.value === 'zh' ? '全部科目 (全科)' : 'All Subjects'
+})
+
+const currentScopeIcon = computed(() => {
+  if (currentScope.value) {
+    return currentScope.value.icon || '📘'
+  }
+  return '📚'
+})
+
+// 收藏题目中按学科统计题目数
+const scopeFilterOptions = computed(() => {
+  const countMap = new Map()
+  favoritesStore.favorites.value.forEach(item => {
+    const subj = item.series || getItemSubject(item) || 'CAIE-AL-9702'
+    countMap.set(subj, (countMap.get(subj) || 0) + 1)
+  })
+
+  return ALL_SUBJECTS.map(sub => ({
+    ...sub,
+    count: countMap.get(sub.id) || 0
+  })).sort((a, b) => b.count - a.count)
+})
+
+function handleSelectScope(scopeId) {
+  favoritesStore.setTargetSubjectScope(scopeId)
+  isScopePickerOpen.value = false
+  // 收藏夹内部切换只更改筛选设置，绝不跳转页面！
+}
 
 function formatFolderName(folder) {
   if (!folder) return ''
@@ -30,13 +73,12 @@ function handleSelectFolder(folderId) {
   favoritesStore.isFavoriteMode.value = true
   isFolderDropdownOpen.value = false
 
-  // 规则：在主页点收藏看到全部科目的收藏；在subject页面点收藏只看当前科目的收藏
+  // 如果在主页，跳转到对应学科页查看；若已有指定筛选科目则进入该科目，否则默认CAIE-AL-9702
   if (!route.path.startsWith('/subject/')) {
-    favoritesStore.setTargetSubjectScope('ALL')
-    router.push('/subject/CAIE-AL-9702')
-  } else {
-    const curSubj = route.params.id || 'CAIE-AL-9702'
-    favoritesStore.setTargetSubjectScope(curSubj)
+    const targetSub = (favoritesStore.targetSubjectScope.value && favoritesStore.targetSubjectScope.value !== 'ALL')
+      ? favoritesStore.targetSubjectScope.value
+      : 'CAIE-AL-9702'
+    router.push(`/subject/${encodeURIComponent(targetSub)}`)
   }
 }
 
@@ -181,6 +223,68 @@ onUnmounted(() => {
           </p>
         </div>
 
+        <!-- Subject Scope Filter (收藏夹学科范围筛选器，切换不跳转页面) -->
+        <div class="fav-scope-filter-container">
+          <div 
+            class="fsf-trigger" 
+            :class="{ 'is-open': isScopePickerOpen, 'is-filtered': favoritesStore.targetSubjectScope.value && favoritesStore.targetSubjectScope.value !== 'ALL' }"
+            @click.stop="isScopePickerOpen = !isScopePickerOpen"
+            :title="locale === 'zh' ? '切换收藏夹科目筛选范围（不改变当前页面）' : 'Filter favorites by subject'"
+          >
+            <div class="fsf-left">
+              <span class="fsf-icon">{{ currentScopeIcon }}</span>
+              <span class="fsf-title">{{ currentScopeDisplayName }}</span>
+            </div>
+            <div class="fsf-right">
+              <span class="fsf-tag">{{ (favoritesStore.targetSubjectScope.value && favoritesStore.targetSubjectScope.value !== 'ALL') ? (locale === 'zh' ? '已筛选' : 'Filtered') : (locale === 'zh' ? '全科' : 'All') }}</span>
+              <span class="fsf-arrow" :class="{ 'arrow-up': isScopePickerOpen }">▾</span>
+            </div>
+          </div>
+
+          <!-- Scope Picker List -->
+          <transition name="fold-panel-expand">
+            <div v-if="isScopePickerOpen" class="fsf-picker-dropdown" @click.stop>
+              <!-- All Subjects Option -->
+              <div 
+                class="fsf-picker-item" 
+                :class="{ 'is-selected': !favoritesStore.targetSubjectScope.value || favoritesStore.targetSubjectScope.value === 'ALL' }"
+                @click="handleSelectScope('ALL')"
+              >
+                <div class="fpi-left">
+                  <span class="fpi-icon">📚</span>
+                  <span class="fpi-name">{{ locale === 'zh' ? '全部科目 (全科)' : 'All Subjects' }}</span>
+                </div>
+                <div class="fpi-right">
+                  <span class="fpi-count">{{ favoritesStore.favorites.value.length }} {{ locale === 'zh' ? '题' : '' }}</span>
+                  <span v-if="!favoritesStore.targetSubjectScope.value || favoritesStore.targetSubjectScope.value === 'ALL'" class="fpi-check">✓</span>
+                </div>
+              </div>
+
+              <div class="fsf-divider"></div>
+
+              <!-- Available Subjects -->
+              <div class="fsf-scroll-list">
+                <div 
+                  v-for="sub in scopeFilterOptions" 
+                  :key="sub.id"
+                  class="fsf-picker-item"
+                  :class="{ 'is-selected': favoritesStore.targetSubjectScope.value === sub.id }"
+                  @click="handleSelectScope(sub.id)"
+                >
+                  <div class="fpi-left">
+                    <span class="fpi-icon">{{ sub.icon }}</span>
+                    <span class="fpi-name">{{ sub.shortName || sub.name }}</span>
+                  </div>
+                  <div class="fpi-right">
+                    <span class="fpi-count" :class="{ 'count-zero': sub.count === 0 }">{{ sub.count }} {{ locale === 'zh' ? '题' : '' }}</span>
+                    <span v-if="favoritesStore.targetSubjectScope.value === sub.id" class="fpi-check">✓</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </transition>
+        </div>
+
         <!-- Create new folder row -->
         <div v-if="isCreatingFolder" class="menu-new-folder-row">
           <input 
@@ -210,9 +314,9 @@ onUnmounted(() => {
               <span class="item-name">{{ formatFolderName(folder) }}</span>
             </div>
             <div class="item-right">
-              <span class="item-count">{{ favoritesStore.getFolderCount(folder.id) }} {{ locale === 'zh' ? '题' : '' }}</span>
+              <span class="item-count">{{ favoritesStore.getFolderCount(folder.id, favoritesStore.targetSubjectScope.value) }} {{ locale === 'zh' ? '题' : '' }}</span>
               <button 
-                v-if="favoritesStore.getFolderCount(folder.id) > 0"
+                v-if="favoritesStore.getFolderCount(folder.id, favoritesStore.targetSubjectScope.value) > 0"
                 type="button"
                 class="item-action-btn btn-export-folder" 
                 :class="{ 'btn-active': exportMenuFolderId === folder.id }"
@@ -375,6 +479,196 @@ onUnmounted(() => {
   padding: 6px 8px 8px;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 6px;
+}
+
+/* 学科范围筛选条 */
+.fav-scope-filter-container {
+  margin: 4px 0 8px;
+  position: relative;
+}
+
+.fsf-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: var(--bg-surface-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.fsf-trigger:hover {
+  background: rgba(194, 65, 40, 0.06);
+  border-color: var(--accent-primary-border);
+}
+
+.fsf-trigger.is-open {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-light);
+}
+
+.fsf-trigger.is-filtered {
+  border-color: rgba(194, 65, 40, 0.4);
+}
+
+.fsf-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fsf-icon {
+  font-size: 0.88rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.fsf-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 155px;
+}
+
+.fsf-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.fsf-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-muted);
+}
+
+.fsf-trigger.is-filtered .fsf-tag {
+  background: var(--accent-primary-light);
+  color: var(--accent-primary);
+}
+
+.fsf-arrow {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.fsf-arrow.arrow-up {
+  transform: rotate(180deg);
+}
+
+/* 筛选面板展开菜单 */
+.fsf-picker-dropdown {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(44, 47, 50, 0.12);
+  padding: 6px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.fsf-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+
+.fsf-picker-item:hover {
+  background: var(--bg-surface-subtle);
+}
+
+.fsf-picker-item.is-selected {
+  background: var(--accent-primary-light);
+}
+
+.fpi-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fpi-icon {
+  font-size: 0.88rem;
+  line-height: 1;
+}
+
+.fpi-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.fsf-picker-item.is-selected .fpi-name {
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.fpi-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fpi-count {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.fpi-count.count-zero {
+  opacity: 0.4;
+}
+
+.fpi-check {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--accent-primary);
+}
+
+.fsf-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 4px 2px;
+}
+
+.fsf-scroll-list {
+  max-height: 190px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fsf-scroll-list::-webkit-scrollbar {
+  width: 3px;
+}
+
+.fsf-scroll-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
 }
 
 .fmh-left {

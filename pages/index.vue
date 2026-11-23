@@ -1,63 +1,14 @@
 <script setup>
 import HomeDanmakuStage from '~/components/home/HomeDanmakuStage.vue'
+import { ALL_SECTIONS } from '~/composables/useSubjects'
 
 const { t, locale } = useI18n()
 
-// 1. CAIE (剑桥体系)
-const caieSubjects = [
-  { id: 'CAIE-AL-9702', name: 'Cambridge International A Level Physics (9702)', level: 'A Level', board: 'CAIE', icon: '⚛️', color: 'coral' },
-  { id: 'CAIE-IG-0625', name: 'Cambridge IGCSE Physics (0625)', level: 'IGCSE', board: 'CAIE', icon: '🔭', color: 'amber' },
-]
-
-// 2. EDX (爱德思体系)
-const edxSubjects = [
-  { id: 'EDX-IAL', name: 'Edexcel International A Level Physics', level: 'IAL', board: 'Edexcel', icon: '🔬', color: 'coral' },
-  { id: 'EDX-IG', name: 'Edexcel International GCSE Physics', level: 'IGCSE', board: 'Edexcel', icon: '🚀', color: 'amber' },
-  { id: 'EDX-本土AL', name: 'Edexcel UK A Level Physics', level: 'UK A Level', board: 'Edexcel UK', icon: '🎯', color: 'purple' },
-  { id: 'EDX-本土GCSE', name: 'Edexcel UK GCSE Physics', level: 'UK GCSE', board: 'Edexcel UK', icon: '📡', color: 'slate' },
-]
-
-// 3. AQA (牛津国际与英国本土 AQA 体系)
-const aqaSubjects = [
-  { id: 'AQA-IAL-9630', name: 'OxfordAQA International A Level Physics (9630)', level: 'IAL', board: 'OxfordAQA', icon: '⚡', color: 'teal' },
-  { id: 'AQA-本土AL', name: 'AQA UK A Level Physics (7408)', level: 'UK A Level', board: 'AQA UK', icon: '💡', color: 'slate' },
-  { id: 'AQA-本土GCSE', name: 'AQA UK GCSE Physics (8463)', level: 'UK GCSE', board: 'AQA UK', icon: '🧲', color: 'sage' },
-]
-
-// 4. 竞赛与附加考试 (Physics Olympiad & Admissions Tests)
-const olympiadSubjects = [
-  { id: 'BPhO-R1', name: 'British Physics Olympiad Round 1 (BPhO R1)', level: 'Olympiad', board: 'BPhO', icon: '🏆', color: 'purple' },
-  { id: 'BPhO-R2', name: 'British Physics Olympiad Round 2 (BPhO R2)', level: 'Olympiad', board: 'BPhO', icon: '🥇', color: 'purple' },
-  { id: 'BAAO-R1', name: 'British Astronomy & Astrophysics Olympiad R1', level: 'Olympiad', board: 'BAAO', icon: '🪐', color: 'teal' },
-  { id: 'BAAO-R2', name: 'British Astronomy & Astrophysics Olympiad R2', level: 'Olympiad', board: 'BAAO', icon: '🌟', color: 'teal' },
-  { id: 'PhysicsBowl', name: 'AAPT PhysicsBowl Competition', level: 'Competition', board: 'AAPT', icon: '🎳', color: 'coral' },
-  { id: 'PAT', name: 'Oxford Physics Aptitude Test (PAT)', level: 'Admissions', board: 'Oxford', icon: '🎓', color: 'slate' },
-  { id: 'SPC', name: 'Senior Physics Challenge (SPC)', level: 'Competition', board: 'BPhO', icon: '🎯', color: 'amber' },
-  { id: 'ESAT', name: 'Cambridge ESAT (ENGAA / NSAA Admissions)', level: 'Admissions', board: 'Cambridge', icon: '🧪', color: 'sage' },
-]
-
-const sections = computed(() => [
-  {
-    key: 'caie',
-    title: t('home.caieTitle'),
-    subjects: caieSubjects,
-  },
-  {
-    key: 'edx',
-    title: t('home.edxTitle'),
-    subjects: edxSubjects,
-  },
-  {
-    key: 'aqa',
-    title: t('home.aqaTitle'),
-    subjects: aqaSubjects,
-  },
-  {
-    key: 'olympiad',
-    title: t('home.olympiadTitle'),
-    subjects: olympiadSubjects,
-  },
-])
+const sections = computed(() => ALL_SECTIONS.map(sec => ({
+  key: sec.key,
+  title: locale.value === 'zh' ? sec.titleZh : sec.titleEn,
+  subjects: sec.subjects
+})))
 
 useSeoMeta({
   title: 'Physics Past Paper Repository - Real Exam Questions & Mark Schemes',

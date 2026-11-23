@@ -55,9 +55,19 @@ export function getItemSubject(item: { series?: string; paperFilename?: string; 
   if (fn.includes('0625')) return 'CAIE-IG-0625'
   if (fn.includes('WPH')) return 'EDX-IAL'
   if (fn.includes('4PH')) return 'EDX-IG'
+  if (fn.includes('EDEXCEL') && fn.includes('GCSE')) return 'EDX-本土GCSE'
+  if (fn.includes('EDEXCEL') && (fn.includes('AL') || fn.includes('A LEVEL'))) return 'EDX-本土AL'
   if (fn.includes('9630')) return 'AQA-IAL-9630'
   if (fn.includes('7408')) return 'AQA-本土AL'
   if (fn.includes('8463')) return 'AQA-本土GCSE'
+  if (fn.includes('BPHO') && (fn.includes('R2') || fn.includes('ROUND 2'))) return 'BPhO-R2'
+  if (fn.includes('BPHO')) return 'BPhO-R1'
+  if (fn.includes('BAAO') && (fn.includes('R2') || fn.includes('ROUND 2'))) return 'BAAO-R2'
+  if (fn.includes('BAAO')) return 'BAAO-R1'
+  if (fn.includes('PHYSICSBOWL') || fn.includes('AAPT')) return 'PhysicsBowl'
+  if (fn.includes('PAT')) return 'PAT'
+  if (fn.includes('SPC')) return 'SPC'
+  if (fn.includes('ESAT') || fn.includes('ENGAA') || fn.includes('NSAA')) return 'ESAT'
   return item.board || 'CAIE-AL-9702'
 }
 
@@ -472,13 +482,28 @@ export function useFavorites() {
     return folders.value.find(f => f.id === activeFolderId.value) || folders.value[0]
   })
 
-  // Folder item count helper
-  function getFolderCount(folderId: string): number {
-    return favorites.value.filter(f => f.folderId === folderId).length
+  // Folder item count helper with optional subject filter
+  function getFolderCount(folderId: string, subjectScope?: string): number {
+    return favorites.value.filter(f => {
+      if (f.folderId !== folderId) return false
+      if (subjectScope && subjectScope !== 'ALL') {
+        const itemSubj = f.series || getItemSubject(f)
+        if (itemSubj !== subjectScope) return false
+      }
+      return true
+    }).length
   }
 
-  // Total favorites count
-  const totalFavoritesCount = computed(() => favorites.value.length)
+  // Total favorites count (all or matching targetSubjectScope)
+  const totalFavoritesCount = computed(() => {
+    if (targetSubjectScope.value && targetSubjectScope.value !== 'ALL') {
+      return favorites.value.filter(f => {
+        const itemSubj = f.series || getItemSubject(f)
+        return itemSubj === targetSubjectScope.value
+      }).length
+    }
+    return favorites.value.length
+  })
 
   function setTargetSubjectScope(scope: string) {
     targetSubjectScope.value = scope

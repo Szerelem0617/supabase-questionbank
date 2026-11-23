@@ -39,6 +39,11 @@ async function signOut() {
           <NuxtLink to="/" class="brand-link" :title="locale === 'zh' ? '返回首页' : 'Home'">
             <span class="brand-text">{{ t('nav.brand') }}</span>
           </NuxtLink>
+
+          <span class="nav-brand-slash" aria-hidden="true">/</span>
+
+          <!-- 当前学科展示与全学科切换菜单 -->
+          <TopBarSubjectSwitcher />
         </div>
         
         <div class="nav-actions">
@@ -148,9 +153,13 @@ async function signOut() {
 }
 
 .top-bar {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 56px;
+  z-index: 1000;
   background: var(--bg-glass);
   backdrop-filter: saturate(180%) blur(12px);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
@@ -161,7 +170,8 @@ async function signOut() {
 .nav-container {
   width: 100%;
   max-width: 100%;
-  padding: 11px 36px;
+  height: 56px;
+  padding: 0 36px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -170,7 +180,7 @@ async function signOut() {
 
 @media (max-width: 768px) {
   .nav-container {
-    padding: 10px 16px;
+    padding: 0 16px;
   }
 }
 
@@ -197,6 +207,13 @@ async function signOut() {
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text-main);
+}
+
+.nav-brand-slash {
+  color: var(--border-color);
+  font-size: 0.95rem;
+  font-weight: 400;
+  user-select: none;
 }
 
 .nav-actions {
@@ -464,5 +481,6 @@ async function signOut() {
 
 .main-content {
   flex: 1;
+  padding-top: 56px;
 }
 </style>
