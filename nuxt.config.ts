@@ -20,9 +20,11 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    turnstileSecretKey: process.env.NUXT_TURNSTILE_SECRET_KEY || '',
     public: {
       cdnBaseUrl: process.env.NUXT_PUBLIC_CDN_BASE_URL || 'https://assets.66367749.xyz',
-      r2DevUrl: process.env.NUXT_PUBLIC_R2_DEV_URL || 'https://pub-b20547c0488b456f8b6c033d9a7a1ca1.r2.dev'
+      r2DevUrl: process.env.NUXT_PUBLIC_R2_DEV_URL || 'https://pub-b20547c0488b456f8b6c033d9a7a1ca1.r2.dev',
+      turnstileSiteKey: process.env.NUXT_PUBLIC_TURNSTILE_SITE_KEY || '0x4AAAAAAGOTULWOrL-G5t3M'
     }
   },
 

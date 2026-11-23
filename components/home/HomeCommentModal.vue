@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import TurnstileWidget from '~/components/TurnstileWidget.vue'
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false }
@@ -7,7 +8,6 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'message-posted'])
 
-const client = useSupabaseClient()
 const user = useSupabaseUser()
 const { profile } = useUserProfile()
 const { locale } = useI18n()
@@ -16,6 +16,17 @@ const commentText = ref('')
 const guestNickname = ref('')
 const isSubmitting = ref(false)
 const errorMessage = ref('')
+const turnstileToken = ref('')
+const turnstileRef = ref(null)
+
+// 每次打开弹窗重置状态，保证人机验证凭证新鲜
+watch(() => props.isOpen, (open) => {
+  if (open) {
+    errorMessage.value = ''
+    turnstileToken.value = ''
+    turnstileRef.value?.reset()
+  }
+})
 
 async function handleSubmit() {
   const text = commentText.value.trim()
@@ -27,6 +38,10 @@ async function handleSubmit() {
     errorMessage.value = locale.value === 'zh' ? '留言内容请控制在 140 字以内' : 'Message must be within 140 characters'
     return
   }
+  if (!turnstileToken.value) {
+    errorMessage.value = locale.value === 'zh' ? '请等待 Cloudflare 防人机验证完成' : 'Please complete Cloudflare verification'
+    return
+  }
 
   isSubmitting.value = true
   errorMessage.value = ''
@@ -36,23 +51,22 @@ async function handleSubmit() {
       ? (profile.value?.display_name || user.value.email?.split('@')[0] || '考友')
       : (guestNickname.value.trim() || '考友')
 
-    const payload = {
-      message: text,
-      user_id: user.value ? user.value.id : null
-    }
+    // 通过专属服务端接口校验 Turnstile 后安全入库
+    const res = await $fetch('/api/comments', {
+      method: 'POST',
+      body: {
+        message: text,
+        turnstileToken: turnstileToken.value,
+        userId: user.value ? user.value.id : null
+      }
+    })
 
-    // Insert into Supabase comments table
-    const { data, error } = await client
-      .from('comments')
-      .insert(payload)
-      .select('id, created_at, message, likes')
-      .single()
-
+    const inserted = res?.data
     const newMsgObj = {
-      id: data?.id || `local-${Date.now()}`,
+      id: inserted?.id || `local-${Date.now()}`,
       author: authorName,
       message: text,
-      likes: 0,
+      likes: inserted?.likes || 0,
       liked: false,
       time: '刚刚'
     }
@@ -60,22 +74,13 @@ async function handleSubmit() {
     emit('message-posted', newMsgObj)
     commentText.value = ''
     guestNickname.value = ''
+    turnstileToken.value = ''
+    turnstileRef.value?.reset()
     emit('close')
   } catch (err) {
-    console.warn('Failed to insert comment:', err)
-    // Even if remote insert fails or table constraints, emit to local stream for immediate gratification
-    const fallbackMsg = {
-      id: `local-${Date.now()}`,
-      author: user.value ? (profile.value?.display_name || '考友') : (guestNickname.value.trim() || '考友'),
-      message: text,
-      likes: 0,
-      liked: false,
-      time: '刚刚'
-    }
-    emit('message-posted', fallbackMsg)
-    commentText.value = ''
-    guestNickname.value = ''
-    emit('close')
+    console.warn('[HomeCommentModal] Submission failed:', err)
+    errorMessage.value = err?.statusMessage || err?.data?.statusMessage || (locale.value === 'zh' ? '发送失败，请重试' : 'Submission failed, please retry')
+    turnstileRef.value?.reset()
   } finally {
     isSubmitting.value = false
   }
@@ -133,6 +138,16 @@ async function handleSubmit() {
             </div>
           </div>
 
+          <!-- Cloudflare Turnstile 智能防人机验证 -->
+          <div class="turnstile-section">
+            <TurnstileWidget 
+              ref="turnstileRef" 
+              v-model="turnstileToken" 
+              theme="light" 
+              size="normal" 
+            />
+          </div>
+
           <div v-if="errorMessage" class="error-tip">
             ⚠️ {{ errorMessage }}
           </div>
@@ -147,7 +162,7 @@ async function handleSubmit() {
             <button 
               type="button" 
               class="btn-submit" 
-              :disabled="isSubmitting || !commentText.trim()"
+              :disabled="isSubmitting || !commentText.trim() || !turnstileToken"
               @click="handleSubmit"
             >
               {{ isSubmitting ? (locale === 'zh' ? '发送中...' : 'Posting...') : (locale === 'zh' ? '🚀 发送并上墙' : '🚀 Post Comment') }}
@@ -351,6 +366,17 @@ async function handleSubmit() {
 .char-count.is-limit {
   color: var(--accent-primary);
   font-weight: 700;
+}
+
+.turnstile-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 65px;
+  background: rgba(0, 0, 0, 0.015);
+  border-radius: 8px;
+  border: 1px dashed var(--border-color);
+  padding: 4px 8px;
 }
 
 .error-tip {
