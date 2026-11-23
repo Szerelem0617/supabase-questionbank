@@ -36,47 +36,43 @@ async function signOut() {
           <!-- 常驻左上角收藏夹图标按钮（点击直接管理/进入收藏夹） -->
           <FavoritesDropdown />
 
-          <NuxtLink to="/" class="brand-link" :title="locale === 'zh' ? '返回首页' : 'Home'">
-            <span class="brand-text">{{ t('nav.brand') }}</span>
-          </NuxtLink>
-
-          <span class="nav-brand-slash" aria-hidden="true">/</span>
-
-          <!-- 当前学科展示与全学科切换菜单 -->
+          <!-- 当前学科展示与全学科切换菜单（含返回首页全科总览选项） -->
           <TopBarSubjectSwitcher />
         </div>
         
         <div class="nav-actions">
-          <!-- 弹幕与留言双功能分段按钮 (高度 34px, 圆角 8px, 清晰界限分段交互) -->
+          <!-- 弹幕与留言双功能分段按钮 (左侧: 发弹幕独立动作 / 右侧: 弹幕飘字显示独立微型滑动开关) -->
           <div 
             class="comment-split-control" 
             :class="{ 'is-off': !danmakuStore.danmakuEnabled.value }"
           >
-            <!-- 点击点 1：留下弹幕留言评论 (Emoji / 弹幕图标与文案) -->
+            <!-- 功能 1：留下弹幕留言评论 (明确动作：发弹幕 / Post) -->
             <button
               type="button"
               class="csc-btn csc-post-btn"
               @click="danmakuStore.openCommentModal"
-              :title="locale === 'zh' ? '留下弹幕评论' : 'Leave a comment'"
+              :title="locale === 'zh' ? '点击发表弹幕评论或留言' : 'Post a comment or note'"
             >
               <span class="csc-icon">💬</span>
-              <span class="csc-text">{{ locale === 'zh' ? '弹幕' : 'Comment' }}</span>
+              <span class="csc-text">{{ locale === 'zh' ? '发弹幕' : 'Post' }}</span>
             </button>
 
-            <!-- 清晰分界线 -->
+            <!-- 鲜明分界线 -->
             <div class="csc-divider" aria-hidden="true"></div>
 
-            <!-- 点击点 2：开 / 关 全局弹幕显示 -->
+            <!-- 功能 2：开 / 关 全局弹幕屏幕飘字显示 (直观微型滑动开关) -->
             <button
               type="button"
               class="csc-btn csc-toggle-btn"
               @click="danmakuStore.toggleDanmaku"
+              :class="{ 'is-active': danmakuStore.danmakuEnabled.value }"
               :title="danmakuStore.danmakuEnabled.value 
-                ? (locale === 'zh' ? '弹幕显示: 已开启 (点击关闭)' : 'Comments: ON (Click to turn off)') 
-                : (locale === 'zh' ? '弹幕显示: 已关闭 (点击开启)' : 'Comments: OFF (Click to turn on)')"
+                ? (locale === 'zh' ? '弹幕飘字显示：已开启 (点击关闭)' : 'Barrage: ON (Click to turn off)') 
+                : (locale === 'zh' ? '弹幕飘字显示：已关闭 (点击开启)' : 'Barrage: OFF (Click to turn on)')"
             >
-              <span class="csc-pill" :class="{ 'pill-on': danmakuStore.danmakuEnabled.value }">
-                {{ danmakuStore.danmakuEnabled.value ? (locale === 'zh' ? '开' : 'ON') : (locale === 'zh' ? '关' : 'OFF') }}
+              <span class="csc-switch-label">{{ locale === 'zh' ? '显示' : 'Show' }}</span>
+              <span class="csc-switch-track" :class="{ 'track-on': danmakuStore.danmakuEnabled.value }">
+                <span class="csc-switch-thumb"></span>
               </span>
             </button>
           </div>
@@ -237,8 +233,8 @@ async function signOut() {
 }
 
 .comment-split-control:hover {
-  border-color: var(--accent-primary-border);
-  box-shadow: 0 2px 6px rgba(194, 65, 40, 0.1);
+  border-color: rgba(194, 65, 40, 0.35);
+  box-shadow: 0 2px 6px rgba(194, 65, 40, 0.08);
 }
 
 .comment-split-control.is-off {
@@ -259,9 +255,10 @@ async function signOut() {
   box-sizing: border-box;
 }
 
+/* 功能 1：发弹幕动作区 */
 .csc-post-btn {
   gap: 5px;
-  padding: 0 10px 0 9px;
+  padding: 0 10px 0 10px;
   color: var(--text-main);
 }
 
@@ -279,37 +276,73 @@ async function signOut() {
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
+/* 鲜明分界线 */
 .csc-divider {
   width: 1px;
-  height: 16px;
+  height: 18px;
   background: var(--border-color);
   flex-shrink: 0;
+  opacity: 0.8;
 }
 
+/* 功能 2：弹幕显示微型开关区 */
 .csc-toggle-btn {
-  padding: 0 8px;
+  padding: 0 9px 0 8px;
+  gap: 6px;
+  color: var(--text-muted);
 }
 
 .csc-toggle-btn:hover {
-  background: rgba(44, 47, 50, 0.04);
+  background: rgba(44, 47, 50, 0.05);
 }
 
-.csc-pill {
-  font-size: 0.68rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(44, 47, 50, 0.08);
+.csc-switch-label {
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   color: var(--text-muted);
-  line-height: 1.2;
-  transition: all 0.16s ease;
+  white-space: nowrap;
 }
 
-.csc-pill.pill-on {
-  background: var(--accent-primary-light);
-  color: var(--accent-primary);
+.csc-toggle-btn.is-active .csc-switch-label {
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+/* 微型开关轨道 */
+.csc-switch-track {
+  width: 24px;
+  height: 14px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  position: relative;
+  transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.csc-switch-track.track-on {
+  background: var(--accent-primary);
+}
+
+/* 微型开关滑块 */
+.csc-switch-thumb {
+  position: absolute;
+  top: 1.5px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.csc-switch-track.track-on .csc-switch-thumb {
+  transform: translateX(9px);
 }
 
 .help-info-btn {

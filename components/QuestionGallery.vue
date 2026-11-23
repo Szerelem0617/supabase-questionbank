@@ -7,6 +7,7 @@ import { useImageStitcher } from '~/composables/useImageStitcher'
 import { usePdfExport } from '~/composables/usePdfExport'
 import { getSubjectSeedQuestion } from '~/composables/useSeedQuestion'
 import { useSubjectPool } from '~/composables/useSubjectPool'
+import { getSubjectById } from '~/composables/useSubjects'
 
 import DualSearchBar from './gallery/DualSearchBar.vue'
 import DanmakuStage from './gallery/DanmakuStage.vue'
@@ -548,10 +549,30 @@ function onRemoveFavorite(item) {
   showToast(t('toast.unfavSuccess'))
 }
 
+function onReorderFavorite({ id, direction }) {
+  const changed = favoritesStore.reorderFavorite(id, direction, filteredFavoriteItems.value)
+  if (changed) {
+    nextTick(() => {
+      const el = document.querySelector(`[data-fav-id="${id}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+    })
+  }
+}
+
 function handleExportFavoritesPdf(type = 'questions') {
   const activeF = favoritesStore.folders.value.find(f => f.id === favoritesStore.activeFolderId.value)
-  const folderName = activeF?.isDefault ? t('galleryNav.defaultFolder') : (activeF?.name || t('galleryNav.defaultFolder'))
-  const itemsToExport = filteredFavoriteItems.value.length > 0 ? filteredFavoriteItems.value : currentFolderAllItems.value
+  let folderName = activeF?.isDefault ? t('galleryNav.defaultFolder') : (activeF?.name || t('galleryNav.defaultFolder'))
+  if (favFilterSubject.value && favFilterSubject.value !== 'ALL') {
+    const subSpec = getSubjectById(favFilterSubject.value)
+    folderName += ` (${subSpec?.shortName || favFilterSubject.value})`
+  }
+  const itemsToExport = filteredFavoriteItems.value
+  if (!itemsToExport || itemsToExport.length === 0) {
+    showToast(locale.value === 'zh' ? '⚠️ 当前筛选条件下暂无题目可导出' : '⚠️ No questions match current filter to export')
+    return
+  }
   pdfStore.exportFavoritesPdf({
     folderName,
     items: itemsToExport,
@@ -765,6 +786,7 @@ onUnmounted(() => {
         @toggle-whole-fav="onToggleWholeQuestionFavorite"
         @toggle-subq-fav="onToggleSubQuestionFavorite"
         @remove-favorite="onRemoveFavorite"
+        @reorder-favorite="onReorderFavorite"
         @copy-stitched="handleCopyStitched"
         @search-paper="handleSearchPaper"
         @add-subq-comment="addSubQComment"

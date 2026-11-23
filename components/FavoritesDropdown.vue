@@ -93,9 +93,24 @@ function toggleFolderExportMenu(folderId) {
 
 function handleExportFolder(folder, type = 'questions') {
   exportMenuFolderId.value = null
-  const items = favoritesStore.favorites.value.filter(item => item.folderId === folder.id)
-  if (items.length === 0) return
-  const folderName = folder.isDefault ? t('galleryNav.defaultFolder') : folder.name
+  const scope = favoritesStore.targetSubjectScope.value
+  const items = favoritesStore.favorites.value.filter(item => {
+    if (item.folderId !== folder.id) return false
+    if (scope && scope !== 'ALL') {
+      const itemSubj = item.series || getItemSubject(item) || 'CAIE-AL-9702'
+      if (itemSubj !== scope) return false
+    }
+    return true
+  })
+  if (items.length === 0) {
+    alert(locale.value === 'zh' ? '当前筛选学科下暂无已收藏题目' : 'No favorites found under current subject filter')
+    return
+  }
+  let folderName = folder.isDefault ? t('galleryNav.defaultFolder') : folder.name
+  if (scope && scope !== 'ALL') {
+    const subSpec = getSubjectById(scope)
+    folderName += ` (${subSpec?.shortName || scope})`
+  }
   pdfStore.exportFavoritesPdf({
     folderName,
     items,

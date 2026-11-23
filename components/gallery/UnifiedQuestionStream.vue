@@ -64,6 +64,7 @@ const emit = defineEmits([
   'toggle-whole-fav',
   'toggle-subq-fav',
   'remove-favorite',
+  'reorder-favorite',
   'copy-stitched',
   'search-paper',
   'add-subq-comment',
@@ -81,6 +82,7 @@ const expandedAnswers = ref({})
 const expandedComments = ref({})
 const isShortSubQ = ref({})
 const copyingCardId = ref('')
+const selectedFavId = ref(null)
 
 // Track active visible card index for the Question Rail
 const activeCardIndex = ref(0)
@@ -190,13 +192,48 @@ function handleDocumentClick(e) {
   if (isExportMenuOpen.value && !e.target.closest('.export-pdf-wrap')) {
     isExportMenuOpen.value = false
   }
+  if (selectedFavId.value && !e.target.closest('.fav-card')) {
+    selectedFavId.value = null
+  }
 }
+
+function handleGlobalKeyDown(e) {
+  if (props.mode !== 'favorites' || !selectedFavId.value) return
+  const targetTag = (e.target?.tagName || '').toLowerCase()
+  if (targetTag === 'input' || targetTag === 'textarea' || e.target?.isContentEditable) return
+
+  if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    emit('reorder-favorite', { id: selectedFavId.value, direction: 'up' })
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    emit('reorder-favorite', { id: selectedFavId.value, direction: 'down' })
+  } else if (e.key === 'Escape') {
+    selectedFavId.value = null
+  }
+}
+
+watch(() => props.mode, (newMode) => {
+  if (newMode !== 'favorites') {
+    selectedFavId.value = null
+  }
+})
+
+watch(streamItems, (items) => {
+  if (selectedFavId.value) {
+    const curIdx = items.findIndex(it => it.id === selectedFavId.value)
+    if (curIdx >= displayedLimit.value) {
+      displayedLimit.value = curIdx + 1
+    }
+  }
+})
 
 onMounted(() => {
   setupSentinel()
   setupCardObserver()
   if (typeof window !== 'undefined') {
     document.addEventListener('click', handleDocumentClick)
+    window.addEventListener('keydown', handleGlobalKeyDown)
   }
 })
 
@@ -205,6 +242,7 @@ onUnmounted(() => {
   if (cardIntersectionObserver) cardIntersectionObserver.disconnect()
   if (typeof window !== 'undefined') {
     document.removeEventListener('click', handleDocumentClick)
+    window.removeEventListener('keydown', handleGlobalKeyDown)
   }
 })
 
@@ -443,7 +481,10 @@ defineExpose({
             :key="item.id || idx"
             :id="`stream-card-${idx}`"
             :data-card-index="idx"
+            :data-fav-id="item.id"
             class="stream-question-card fav-card"
+            :class="{ 'is-selected-gold': selectedFavId === item.id }"
+            @click="selectedFavId = item.id"
           >
             <div class="card-header">
               <div class="header-tags">
@@ -974,6 +1015,18 @@ defineExpose({
 
 .stream-question-card.is-active-card {
   border-color: rgba(194, 65, 40, 0.4);
+}
+
+.stream-question-card.fav-card {
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.stream-question-card.fav-card.is-selected-gold {
+  border: 2px solid #d97706 !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35), 0 8px 24px rgba(217, 119, 6, 0.14) !important;
+  position: relative;
+  z-index: 5;
 }
 
 .card-header {

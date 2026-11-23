@@ -477,6 +477,60 @@ export function useFavorites() {
     return false
   }
 
+  /**
+   * Reorder a favorite item within a folder, respecting any active visible subset (e.g. subject filter).
+   * @param favId ID of the favorite item
+   * @param direction 'up' | 'down'
+   * @param visibleItems Optional subset array currently displayed on screen
+   */
+  function reorderFavorite(favId: string, direction: 'up' | 'down', visibleItems?: FavoriteItem[]): boolean {
+    const list = visibleItems && visibleItems.length > 0 ? visibleItems : favorites.value
+    const visibleIndex = list.findIndex(item => item.id === favId)
+    if (visibleIndex < 0) return false
+
+    if (direction === 'up') {
+      if (visibleIndex === 0) return false // Already at top of visible list
+      const targetNeighbor = list[visibleIndex - 1]
+
+      const masterCurrentIndex = favorites.value.findIndex(item => item.id === favId)
+      if (masterCurrentIndex < 0) return false
+
+      const [itemToMove] = favorites.value.splice(masterCurrentIndex, 1)
+      const masterTargetIndex = favorites.value.findIndex(item => item.id === targetNeighbor.id)
+
+      if (masterTargetIndex < 0) {
+        // Fallback: put back
+        favorites.value.splice(masterCurrentIndex, 0, itemToMove)
+        return false
+      }
+
+      favorites.value.splice(masterTargetIndex, 0, itemToMove)
+      saveFavorites()
+      return true
+    } else if (direction === 'down') {
+      if (visibleIndex === list.length - 1) return false // Already at bottom of visible list
+      const targetNeighbor = list[visibleIndex + 1]
+
+      const masterCurrentIndex = favorites.value.findIndex(item => item.id === favId)
+      if (masterCurrentIndex < 0) return false
+
+      const [itemToMove] = favorites.value.splice(masterCurrentIndex, 1)
+      const masterTargetIndex = favorites.value.findIndex(item => item.id === targetNeighbor.id)
+
+      if (masterTargetIndex < 0) {
+        // Fallback: put back
+        favorites.value.splice(masterCurrentIndex, 0, itemToMove)
+        return false
+      }
+
+      favorites.value.splice(masterTargetIndex + 1, 0, itemToMove)
+      saveFavorites()
+      return true
+    }
+
+    return false
+  }
+
   // Active folder object
   const activeFolder = computed(() => {
     return folders.value.find(f => f.id === activeFolderId.value) || folders.value[0]
@@ -529,6 +583,7 @@ export function useFavorites() {
     toggleFavorite,
     moveFavorite,
     removeFavoriteById,
+    reorderFavorite,
     getFolderCount,
     isCloudSyncing,
     syncWithCloud
