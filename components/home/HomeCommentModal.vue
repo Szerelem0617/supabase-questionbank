@@ -65,6 +65,7 @@ async function handleSubmit() {
     const newMsgObj = {
       id: inserted?.id || `local-${Date.now()}`,
       author: authorName,
+      avatarUrl: user.value ? (profile.value?.avatar_url || null) : null,
       message: text,
       likes: inserted?.likes || 0,
       liked: false,

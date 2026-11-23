@@ -41,6 +41,16 @@ async function signOut() {
         </div>
         
         <div class="nav-actions">
+          <!-- 帮助与功能提示按钮 (i) - 移至弹幕左侧 -->
+          <button 
+            type="button" 
+            class="help-info-btn" 
+            @click="isHelpModalOpen = true"
+            :title="locale === 'zh' ? '使用指南与快捷键' : 'User Guide & Shortcuts'"
+          >
+            <span class="info-letter">i</span>
+          </button>
+
           <!-- 弹幕与留言双功能分段按钮 (左侧: 发弹幕独立动作 / 右侧: 弹幕飘字显示独立微型滑动开关) -->
           <div 
             class="comment-split-control" 
@@ -77,16 +87,6 @@ async function signOut() {
             </button>
           </div>
 
-          <!-- 帮助与功能提示按钮 (i) -->
-          <button 
-            type="button" 
-            class="help-info-btn" 
-            @click="isHelpModalOpen = true"
-            :title="locale === 'zh' ? '使用指南与快捷键' : 'User Guide & Shortcuts'"
-          >
-            <span class="info-letter">i</span>
-          </button>
-
           <!-- Top Right Bilingual Switcher -->
           <button 
             type="button" 
@@ -100,15 +100,24 @@ async function signOut() {
             <span class="lang-mode" :class="{ active: locale === 'en' }">EN</span>
           </button>
 
-          <!-- Auth Status -->
+          <!-- Auth Status: 登录状态双功能一体聚合胶囊 [ 头像+昵称 | 退出登录 ] -->
           <div class="auth-widget">
             <template v-if="user">
-              <NuxtLink to="/profile" class="user-info-link" :title="t('nav.profile')">
-                <img :src="profile?.avatar_url || 'https://via.placeholder.com/32'" class="nav-avatar" alt="Avatar" />
-                <span class="user-name">{{ profile?.display_name || user.email?.split('@')[0] || 'User' }}</span>
-              </NuxtLink>
+              <div class="user-split-control">
+                <!-- 左半段：进入个人主页与资料修改 -->
+                <NuxtLink to="/profile" class="usc-profile-link" :title="t('nav.profile')">
+                  <img :src="profile?.avatar_url || 'https://via.placeholder.com/32'" class="nav-avatar" alt="Avatar" />
+                  <span class="user-name">{{ profile?.display_name || user.email?.split('@')[0] || 'User' }}</span>
+                </NuxtLink>
 
-              <button @click="signOut" class="btn-signout">{{ t('nav.signOut') }}</button>
+                <!-- 鲜明分界线 -->
+                <div class="usc-divider" aria-hidden="true"></div>
+
+                <!-- 右半段：退出登录 -->
+                <button type="button" @click="signOut" class="usc-signout-btn" :title="t('nav.signOut')">
+                  {{ t('nav.signOut') }}
+                </button>
+              </div>
             </template>
             <template v-else>
               <NuxtLink to="/login" class="btn-signin">{{ t('nav.signIn') }}</NuxtLink>
@@ -429,61 +438,85 @@ async function signOut() {
   gap: 8px;
 }
 
-.user-info-link {
+.user-split-control {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
   height: 34px;
-  padding: 0 12px 0 5px;
   border-radius: 8px;
-  background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.03);
-  transition: all 0.16s ease;
-  text-decoration: none;
+  background: var(--bg-surface);
+  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.04);
   box-sizing: border-box;
+  overflow: hidden;
+  transition: all 0.16s ease;
+  user-select: none;
 }
 
-.user-info-link:hover {
+.user-split-control:hover {
+  border-color: rgba(194, 65, 40, 0.35);
+  box-shadow: 0 2px 6px rgba(194, 65, 40, 0.08);
+}
+
+.usc-profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 100%;
+  padding: 0 10px 0 6px;
+  text-decoration: none;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.usc-profile-link:hover {
   background: var(--bg-surface-subtle);
-  border-color: var(--accent-primary);
 }
 
 .nav-avatar {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   object-fit: cover;
+  flex-shrink: 0;
 }
 
 .user-name {
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--text-main);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.btn-signout {
+.usc-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border-color);
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.usc-signout-btn {
+  background: transparent;
+  border: none;
+  height: 100%;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  height: 34px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-surface);
-  color: var(--text-muted);
-  padding: 0 12px;
-  font-size: 0.8rem;
+  padding: 0 10px;
+  font-size: 0.78rem;
   font-weight: 500;
-  border-radius: 8px;
-  cursor: pointer;
-  box-shadow: 0 1px 2px rgba(44, 47, 50, 0.03);
-  transition: all 0.16s ease;
+  color: var(--text-muted);
+  transition: background 0.15s ease, color 0.15s ease;
   box-sizing: border-box;
+  white-space: nowrap;
 }
 
-.btn-signout:hover {
-  background: var(--bg-surface-subtle);
-  color: var(--text-main);
-  border-color: var(--text-muted);
+.usc-signout-btn:hover {
+  background: rgba(194, 65, 40, 0.08);
+  color: var(--accent-primary);
 }
 
 .btn-signin {

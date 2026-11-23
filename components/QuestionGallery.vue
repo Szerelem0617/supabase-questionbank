@@ -202,6 +202,7 @@ const allDanmakuList = computed(() => {
           subQId: subQ.id,
           qnum: subQ.question_raw_number || (subQ.paper_type === 'MCQ' ? `Q${subQ.question_raw_number || '1'}` : 'Q1'),
           author: c.profiles?.display_name || c.author || '考友',
+          avatarUrl: c.profiles?.avatar_url || c.avatarUrl || null,
           message: c.message,
           time: c.time || '刚刚',
           likes: c.likes || 0,
@@ -313,6 +314,7 @@ async function fetchSubQComments(subQId, rawNum = '') {
     const dbComments = (!error && data) ? data.map(c => ({
       ...c,
       author: c.profiles?.display_name || '考友',
+      avatarUrl: c.profiles?.avatar_url || null,
       liked: false
     })) : []
 

@@ -69,6 +69,7 @@ async function fetchHomepageComments() {
       const dbComments = data.map(c => ({
         id: c.id,
         author: c.profiles?.display_name || '考友',
+        avatarUrl: c.profiles?.avatar_url || null,
         message: c.message,
         likes: c.likes || 0,
         liked: checkIsLiked(c.id),
@@ -163,10 +164,18 @@ onMounted(() => {
             </button>
           </div>
 
-          <!-- 悬停详情卡片：展示留言者、时间与完整内容 -->
+          <!-- 悬停详情卡片：展示留言者、头像、时间与完整内容 -->
           <div class="danmaku-hover-card" @click.stop>
             <div class="hover-card-header">
-              <span class="hover-tag">💬 {{ item.author }}</span>
+              <div class="hover-author-wrap">
+                <img 
+                  v-if="item.avatarUrl" 
+                  :src="item.avatarUrl" 
+                  class="hover-avatar" 
+                  alt="Avatar"
+                />
+                <span class="hover-tag">{{ item.avatarUrl ? '' : '💬 ' }}{{ item.author }}</span>
+              </div>
               <span class="hover-time">{{ item.time || '刚刚' }}</span>
             </div>
             <div class="hover-card-content">
@@ -355,6 +364,22 @@ onMounted(() => {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 6px;
+}
+
+.hover-author-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hover-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(44, 47, 50, 0.12);
+  flex-shrink: 0;
 }
 
 .hover-tag {

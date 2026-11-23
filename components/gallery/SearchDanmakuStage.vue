@@ -101,7 +101,15 @@ function onIteration(laneGroup, laneIdx) {
 
             <div class="danmaku-hover-card" @click.stop>
               <div class="hover-card-header">
-                <span class="hover-tag">💬 {{ item.author }}</span>
+                <div class="hover-author-wrap">
+                  <img 
+                    v-if="item.avatarUrl" 
+                    :src="item.avatarUrl" 
+                    class="hover-avatar" 
+                    alt="Avatar"
+                  />
+                  <span class="hover-tag">{{ item.avatarUrl ? '' : '💬 ' }}{{ item.author }}</span>
+                </div>
                 <span class="hover-time">{{ item.time || '刚刚' }}</span>
               </div>
               <div class="hover-card-content">
@@ -152,7 +160,15 @@ function onIteration(laneGroup, laneIdx) {
 
             <div class="danmaku-hover-card" @click.stop>
               <div class="hover-card-header">
-                <span class="hover-tag">💬 {{ item.author }}</span>
+                <div class="hover-author-wrap">
+                  <img 
+                    v-if="item.avatarUrl" 
+                    :src="item.avatarUrl" 
+                    class="hover-avatar" 
+                    alt="Avatar"
+                  />
+                  <span class="hover-tag">{{ item.avatarUrl ? '' : '💬 ' }}{{ item.author }}</span>
+                </div>
                 <span class="hover-time">{{ item.time || '刚刚' }}</span>
               </div>
               <div class="hover-card-content">
@@ -206,7 +222,15 @@ function onIteration(laneGroup, laneIdx) {
 
             <div class="danmaku-hover-card" @click.stop>
               <div class="hover-card-header">
-                <span class="hover-tag">💬 {{ item.author }}</span>
+                <div class="hover-author-wrap">
+                  <img 
+                    v-if="item.avatarUrl" 
+                    :src="item.avatarUrl" 
+                    class="hover-avatar" 
+                    alt="Avatar"
+                  />
+                  <span class="hover-tag">{{ item.avatarUrl ? '' : '💬 ' }}{{ item.author }}</span>
+                </div>
                 <span class="hover-time">{{ item.time || '刚刚' }}</span>
               </div>
               <div class="hover-card-content">
@@ -257,7 +281,15 @@ function onIteration(laneGroup, laneIdx) {
 
             <div class="danmaku-hover-card" @click.stop>
               <div class="hover-card-header">
-                <span class="hover-tag">💬 {{ item.author }}</span>
+                <div class="hover-author-wrap">
+                  <img 
+                    v-if="item.avatarUrl" 
+                    :src="item.avatarUrl" 
+                    class="hover-avatar" 
+                    alt="Avatar"
+                  />
+                  <span class="hover-tag">{{ item.avatarUrl ? '' : '💬 ' }}{{ item.author }}</span>
+                </div>
                 <span class="hover-time">{{ item.time || '刚刚' }}</span>
               </div>
               <div class="hover-card-content">
@@ -486,6 +518,22 @@ function onIteration(laneGroup, laneIdx) {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 6px;
+}
+
+.hover-author-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hover-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(44, 47, 50, 0.12);
+  flex-shrink: 0;
 }
 
 .hover-tag {

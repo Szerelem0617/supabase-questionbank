@@ -57,7 +57,15 @@ const emit = defineEmits(['slot-iteration', 'toggle-like', 'focus-subq'])
             <!-- 悬停详情卡片 -->
             <div class="danmaku-hover-card" @click.stop>
               <div class="hover-card-header">
-                <span class="hover-tag">💬 {{ slot.item.author || (locale === 'zh' ? '考友' : 'Student') }}</span>
+                <div class="hover-author-wrap">
+                  <img 
+                    v-if="slot.item.avatarUrl" 
+                    :src="slot.item.avatarUrl" 
+                    class="hover-avatar" 
+                    alt="Avatar"
+                  />
+                  <span class="hover-tag">{{ slot.item.avatarUrl ? '' : '💬 ' }}{{ slot.item.author || (locale === 'zh' ? '考友' : 'Student') }}</span>
+                </div>
                 <span v-if="slot.item.qnum" class="hover-qnum-tag">{{ slot.item.qnum }}</span>
                 <span class="hover-time">{{ slot.item.time }}</span>
               </div>
@@ -133,7 +141,15 @@ const emit = defineEmits(['slot-iteration', 'toggle-like', 'focus-subq'])
             <!-- 悬停详情卡片 -->
             <div class="danmaku-hover-card" @click.stop>
               <div class="hover-card-header">
-                <span class="hover-tag">💬 {{ slot.item.author || (locale === 'zh' ? '考友' : 'Student') }}</span>
+                <div class="hover-author-wrap">
+                  <img 
+                    v-if="slot.item.avatarUrl" 
+                    :src="slot.item.avatarUrl" 
+                    class="hover-avatar" 
+                    alt="Avatar"
+                  />
+                  <span class="hover-tag">{{ slot.item.avatarUrl ? '' : '💬 ' }}{{ slot.item.author || (locale === 'zh' ? '考友' : 'Student') }}</span>
+                </div>
                 <span v-if="slot.item.qnum" class="hover-qnum-tag">{{ slot.item.qnum }}</span>
                 <span class="hover-time">{{ slot.item.time }}</span>
               </div>
@@ -333,6 +349,22 @@ const emit = defineEmits(['slot-iteration', 'toggle-like', 'focus-subq'])
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
+}
+
+.hover-author-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hover-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(44, 47, 50, 0.12);
+  flex-shrink: 0;
 }
 
 .hover-tag {
