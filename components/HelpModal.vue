@@ -118,201 +118,84 @@ onUnmounted(() => {
             </button>
           </div>
 
-          <!-- 弹窗主体内容：上部为当前页面教学，下部为通用操作教学，单页纵向滑动无需 Tab 切换 -->
+          <!-- 弹窗主体内容：当前上下文操作与全局快捷操作一体化平铺展示，无额外分类标题心智负担 -->
           <div class="help-modal-body">
-            <!-- 1. 当前页面专属教学 (基于当前场景) -->
-            <div class="section-group">
-              <div class="section-header">
-                <span class="section-icon">{{ currentContext.icon }}</span>
-                <span class="section-title">{{ locale === 'zh' ? `当前页面 (${currentContext.name})` : `Current Page (${currentContext.name})` }}</span>
-                <span class="active-pill">{{ locale === 'zh' ? '当前' : 'Active' }}</span>
-              </div>
-
-              <div class="action-list">
-                <!-- 收藏模式 -->
-                <template v-if="currentContext.id === 'favorites'">
-                  <div class="action-item highlight-action">
-                    <div class="action-keys">
-                      <kbd>点击卡片</kbd>
-                      <span class="key-sep">+</span>
-                      <kbd>&uarr;</kbd>
-                      <kbd>&darr;</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '卡片金框选中与上下自由排序' : 'Select with Gold Border & Reorder' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '点击题目出现琥珀金边框后，按键盘上下键调整题目顺序，按 ESC 退出选中。' : 'Click card to highlight with gold frame, then press Arrow Up/Down to reorder.' }}</span>
-                    </div>
-                  </div>
-
-                  <div class="action-item">
-                    <div class="action-keys">
-                      <kbd>💡</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '展开 / 隐藏官方评分标准' : 'Toggle Official Mark Scheme' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '就地展开该题的官方 Mark Scheme 答案采分点。' : 'Smoothly reveal or hide official answer scheme and rubric.' }}</span>
-                    </div>
-                  </div>
-
-                  <div class="action-item">
-                    <div class="action-keys">
-                      <kbd>★</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '移出收藏夹' : 'Remove from Favorites' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '再次点击实心星号即可取消收藏。' : 'Click the active star icon to unfavorite the question.' }}</span>
-                    </div>
-                  </div>
-
-                  <div class="action-item">
-                    <div class="action-keys">
-                      <kbd>导出 PDF</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '按学科筛选导出' : 'Export Custom PDF' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '可导出整套练习卷、官方答案卷或题+答合订版。' : 'Export question sheet, mark scheme, or combined PDF booklet.' }}</span>
-                    </div>
-                  </div>
-                </template>
-
-                <!-- 搜题模式 -->
-                <template v-else-if="currentContext.id === 'search'">
-                  <div class="action-item highlight-action">
-                    <div class="action-keys">
-                      <kbd>qp:试卷名</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '查整套卷' : 'Find Full Past Paper' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '输入如 qp:9702_s23_qp_22 可一次性调出整份试卷全部大题。' : 'Type qp:filename to pull up every question from that specific past paper.' }}</span>
-                    </div>
-                  </div>
-
-                  <div class="action-item">
-                    <div class="action-keys">
-                      <kbd>多关键词</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '知识点联搜' : 'Multi-keyword Topic Search' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '空格隔开多个考点（如 density volume），检索综合压轴大题。' : 'Separate topic keywords by spaces to find comprehensive problems.' }}</span>
-                    </div>
-                  </div>
-
-                  <div class="action-item">
-                    <div class="action-keys">
-                      <kbd>点击题号标签</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '精准高亮定位' : 'Instant Subquestion Jump' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '点击命中结果中的 Part (b) 等小题标签，自动平滑滚动并高亮定位。' : 'Click matched subquestion tags to scroll and focus directly on that part.' }}</span>
-                    </div>
-                  </div>
-
-                  <div class="action-item">
-                    <div class="action-keys">
-                      <kbd>ESC</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '清空或退出搜索' : 'Clear / Exit Search' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '清空搜索词恢复原本真题流。' : 'Clear search term to return to normal question stream.' }}</span>
-                    </div>
-                  </div>
-                </template>
-
-                <!-- 刷题与做题模式 -->
-                <template v-else-if="currentContext.id === 'stream'">
-                  <div class="action-item">
-                    <div class="action-keys">
-                      <kbd>&larr;</kbd>
-                      <kbd>&rarr;</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '左右键：快速切换大题' : 'Left/Right: Switch Big Question' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '键盘左右方向键在连续大题或试卷间快速跳转。' : 'Use ArrowLeft/ArrowRight to jump between consecutive big questions.' }}</span>
-                    </div>
-                  </div>
-
-                  <div class="action-item highlight-action">
-                    <div class="action-keys">
-                      <kbd>&uarr;</kbd>
-                      <kbd>&darr;</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '上下键：逐个定位小问' : 'Up/Down: Step Through Sub-questions' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '键盘上下键（或 K/J）依次精准定位并高亮子小问。' : 'Use ArrowUp/ArrowDown (or K/J) to smoothly snap and focus through sub-parts.' }}</span>
-                    </div>
-                  </div>
-
-                  <div class="action-item">
-                    <div class="action-keys">
-                      <kbd>📋</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '大题高清长图拼接' : 'Copy Stitched Full Question' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '点击大题右上角长图图标，一键将题干与所有小题拼接并复制高清图片到剪贴板。' : 'One-click stitches all subquestions into a high-res image and copies to clipboard.' }}</span>
-                    </div>
-                  </div>
-
-                  <div class="action-item">
-                    <div class="action-keys">
-                      <kbd>💡</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '查看小问答案' : 'Reveal Subquestion Answer' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '展开官方评分标准与采分点明细。' : 'Reveal official mark scheme and grading criteria.' }}</span>
-                    </div>
-                  </div>
-
-                  <div class="action-item">
-                    <div class="action-keys">
-                      <kbd>☆</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '收藏整题或单小题' : 'Favorite Whole or Part' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '点击大题顶栏收藏整题，或在小题栏单独收藏难问。' : 'Favorite the entire problem or bookmark individual difficult parts.' }}</span>
-                    </div>
-                  </div>
-                </template>
-
-                <!-- 首页模式 -->
-                <template v-else-if="currentContext.id === 'home'">
-                  <div class="action-item">
-                    <div class="action-keys">
-                      <kbd>点击科目</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '进入专属题库' : 'Enter Question Bank' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '覆盖 CAIE、Edexcel、AQA 国际课程与竞赛真题。' : 'Access CAIE, Edexcel, AQA A-Level and Olympiad archives.' }}</span>
-                    </div>
-                  </div>
-
-                  <div class="action-item">
-                    <div class="action-keys">
-                      <kbd>🌐 中 / EN</kbd>
-                    </div>
-                    <div class="action-text">
-                      <span class="action-name">{{ locale === 'zh' ? '即时双语切换' : 'Bilingual Switch' }}</span>
-                      <span class="action-desc">{{ locale === 'zh' ? '全站界面支持中英双语无刷新切换。' : 'Seamlessly switch site language between English and Chinese.' }}</span>
-                    </div>
-                  </div>
-                </template>
-              </div>
-            </div>
-
-            <!-- 2. 下部：通用操作与全局快捷键 -->
-            <div class="section-group">
-              <div class="section-header">
-                <span class="section-icon">⌨️</span>
-                <span class="section-title">{{ locale === 'zh' ? '通用快捷操作' : 'General Shortcuts' }}</span>
-              </div>
-
-              <div class="action-list">
-                <div class="action-item">
+            <div class="action-list">
+              <!-- 1. 收藏模式 -->
+              <template v-if="currentContext.id === 'favorites'">
+                <div class="action-item highlight-action">
                   <div class="action-keys">
-                    <kbd>/</kbd>
+                    <kbd>点击卡片</kbd>
+                    <span class="key-sep">+</span>
+                    <kbd>&uarr;</kbd>
+                    <kbd>&darr;</kbd>
                   </div>
                   <div class="action-text">
-                    <span class="action-name">{{ locale === 'zh' ? '聚焦搜索框' : 'Focus Search Bar' }}</span>
-                    <span class="action-desc">{{ locale === 'zh' ? '任意时刻按下斜杠键，光标立即定位到搜题输入框。' : 'Press slash anytime to activate the search box.' }}</span>
+                    <span class="action-name">{{ locale === 'zh' ? '卡片金框选中与上下自由排序' : 'Select with Gold Border & Reorder' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '点击题目出现琥珀金边框后，按键盘上下键调整题目顺序，按 ESC 退出选中。' : 'Click card to highlight with gold frame, then press Arrow Up/Down to reorder.' }}</span>
+                  </div>
+                </div>
+
+                <div class="action-item">
+                  <div class="action-keys">
+                    <kbd>💡</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '展开 / 隐藏官方评分标准' : 'Toggle Official Mark Scheme' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '就地展开该题的官方 Mark Scheme 答案采分点。' : 'Smoothly reveal or hide official answer scheme and rubric.' }}</span>
+                  </div>
+                </div>
+
+                <div class="action-item">
+                  <div class="action-keys">
+                    <kbd>★</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '移出收藏夹' : 'Remove from Favorites' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '再次点击实心星号即可取消收藏。' : 'Click the active star icon to unfavorite the question.' }}</span>
+                  </div>
+                </div>
+
+                <div class="action-item">
+                  <div class="action-keys">
+                    <kbd>导出 PDF</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '按学科筛选导出' : 'Export Custom PDF' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '可导出整套练习卷、官方答案卷或题+答合订版。' : 'Export question sheet, mark scheme, or combined PDF booklet.' }}</span>
+                  </div>
+                </div>
+              </template>
+
+              <!-- 2. 搜题模式 -->
+              <template v-else-if="currentContext.id === 'search'">
+                <div class="action-item highlight-action">
+                  <div class="action-keys">
+                    <kbd>qp:试卷名</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '查整套卷' : 'Find Full Past Paper' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '输入如 qp:9702_s23_qp_22 可一次性调出整份试卷全部大题。' : 'Type qp:filename to pull up every question from that specific past paper.' }}</span>
+                  </div>
+                </div>
+
+                <div class="action-item">
+                  <div class="action-keys">
+                    <kbd>多关键词</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '知识点联搜' : 'Multi-keyword Topic Search' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '空格隔开多个考点（如 density volume），检索综合压轴大题。' : 'Separate topic keywords by spaces to find comprehensive problems.' }}</span>
+                  </div>
+                </div>
+
+                <div class="action-item">
+                  <div class="action-keys">
+                    <kbd>点击题号标签</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '精准高亮定位' : 'Instant Subquestion Jump' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '点击命中结果中的 Part (b) 等小题标签，自动平滑滚动并高亮定位。' : 'Click matched subquestion tags to scroll and focus directly on that part.' }}</span>
                   </div>
                 </div>
 
@@ -321,19 +204,118 @@ onUnmounted(() => {
                     <kbd>ESC</kbd>
                   </div>
                   <div class="action-text">
-                    <span class="action-name">{{ locale === 'zh' ? '退出与取消选中' : 'Dismiss / Deselect' }}</span>
-                    <span class="action-desc">{{ locale === 'zh' ? '关闭帮助弹窗、侧边栏，或取消卡片金框选中。' : 'Close modal, drawers, or deselect highlighted card.' }}</span>
+                    <span class="action-name">{{ locale === 'zh' ? '清空或退出搜索' : 'Clear / Exit Search' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '清空搜索词恢复原本真题流。' : 'Clear search term to return to normal question stream.' }}</span>
+                  </div>
+                </div>
+              </template>
+
+              <!-- 3. 刷题与做题模式 -->
+              <template v-else-if="currentContext.id === 'stream'">
+                <div class="action-item">
+                  <div class="action-keys">
+                    <kbd>&larr;</kbd>
+                    <kbd>&rarr;</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '左右键：快速切换大题' : 'Left/Right: Switch Big Question' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '键盘左右方向键在连续大题或试卷间快速跳转。' : 'Use ArrowLeft/ArrowRight to jump between consecutive big questions.' }}</span>
+                  </div>
+                </div>
+
+                <div class="action-item highlight-action">
+                  <div class="action-keys">
+                    <kbd>&uarr;</kbd>
+                    <kbd>&darr;</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '上下键：逐个定位小问' : 'Up/Down: Step Through Sub-questions' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '键盘上下键（或 K/J）依次精准定位并高亮子小问。' : 'Use ArrowUp/ArrowDown (or K/J) to smoothly snap and focus through sub-parts.' }}</span>
                   </div>
                 </div>
 
                 <div class="action-item">
                   <div class="action-keys">
-                    <kbd>💬 弹幕</kbd>
+                    <kbd>📋</kbd>
                   </div>
                   <div class="action-text">
-                    <span class="action-name">{{ locale === 'zh' ? '考友交流与显示开关' : 'Danmaku & Display Toggle' }}</span>
-                    <span class="action-desc">{{ locale === 'zh' ? '电脑端顶栏支持发弹幕与一键开关弹幕飘字显示。' : 'Post bullet comments or toggle floating barrage visibility anytime on desktop.' }}</span>
+                    <span class="action-name">{{ locale === 'zh' ? '大题高清长图拼接' : 'Copy Stitched Full Question' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '点击大题右上角长图图标，一键将题干与所有小题拼接并复制高清图片到剪贴板。' : 'One-click stitches all subquestions into a high-res image and copies to clipboard.' }}</span>
                   </div>
+                </div>
+
+                <div class="action-item">
+                  <div class="action-keys">
+                    <kbd>💡</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '查看小问答案' : 'Reveal Subquestion Answer' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '展开官方评分标准与采分点明细。' : 'Reveal official mark scheme and grading criteria.' }}</span>
+                  </div>
+                </div>
+
+                <div class="action-item">
+                  <div class="action-keys">
+                    <kbd>☆</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '收藏整题或单小题' : 'Favorite Whole or Part' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '点击大题顶栏收藏整题，或在小题栏单独收藏难问。' : 'Favorite the entire problem or bookmark individual difficult parts.' }}</span>
+                  </div>
+                </div>
+              </template>
+
+              <!-- 4. 首页模式 -->
+              <template v-else-if="currentContext.id === 'home'">
+                <div class="action-item">
+                  <div class="action-keys">
+                    <kbd>点击科目</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '进入专属题库' : 'Enter Question Bank' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '覆盖 CAIE、Edexcel、AQA 国际课程与竞赛真题。' : 'Access CAIE, Edexcel, AQA A-Level and Olympiad archives.' }}</span>
+                  </div>
+                </div>
+
+                <div class="action-item">
+                  <div class="action-keys">
+                    <kbd>🌐 中 / EN</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '即时双语切换' : 'Bilingual Switch' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '全站界面支持中英双语无刷新切换。' : 'Seamlessly switch site language between English and Chinese.' }}</span>
+                  </div>
+                </div>
+              </template>
+
+              <!-- 5. 通用操作与快捷键（自然顺接，无需冗余小标题） -->
+              <div class="action-item">
+                <div class="action-keys">
+                  <kbd>/</kbd>
+                </div>
+                <div class="action-text">
+                  <span class="action-name">{{ locale === 'zh' ? '聚焦搜索框' : 'Focus Search Bar' }}</span>
+                  <span class="action-desc">{{ locale === 'zh' ? '任意时刻按下斜杠键，光标立即定位到搜题输入框。' : 'Press slash anytime to activate the search box.' }}</span>
+                </div>
+              </div>
+
+              <div class="action-item">
+                <div class="action-keys">
+                  <kbd>ESC</kbd>
+                </div>
+                <div class="action-text">
+                  <span class="action-name">{{ locale === 'zh' ? '退出与取消选中' : 'Dismiss / Deselect' }}</span>
+                  <span class="action-desc">{{ locale === 'zh' ? '关闭帮助弹窗、侧边栏，或取消卡片金框选中。' : 'Close modal, drawers, or deselect highlighted card.' }}</span>
+                </div>
+              </div>
+
+              <div class="action-item">
+                <div class="action-keys">
+                  <kbd>💬 弹幕</kbd>
+                </div>
+                <div class="action-text">
+                  <span class="action-name">{{ locale === 'zh' ? '考友交流与显示开关' : 'Danmaku & Display Toggle' }}</span>
+                  <span class="action-desc">{{ locale === 'zh' ? '电脑端顶栏支持发弹幕与一键开关弹幕飘字显示。' : 'Post bullet comments or toggle floating barrage visibility anytime on desktop.' }}</span>
                 </div>
               </div>
             </div>
@@ -496,42 +478,6 @@ onUnmounted(() => {
   padding: 16px 18px;
   max-height: 480px;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.section-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 2px;
-}
-
-.section-icon {
-  font-size: 0.95rem;
-}
-
-.section-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-  letter-spacing: 0.02em;
-}
-
-.active-pill {
-  font-size: 0.65rem;
-  background: var(--accent-primary-light);
-  color: var(--accent-primary);
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-weight: 700;
 }
 
 .action-list {
