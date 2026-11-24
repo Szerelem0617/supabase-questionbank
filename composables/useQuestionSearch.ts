@@ -147,36 +147,38 @@ function parseSearchQuery(rawKw: string): ParsedQuery {
   }
 }
 
-export function useQuestionSearch(client: any, showToast?: (msg: string) => void, getSeries?: () => string) {
+// Shared singleton search state across components
+const sqKeyword = ref('')
+const sqSelectedPaper = ref('')
+const sqPaperOptions = ref<PaperGroupOption[]>([])
+
+const mcqKeyword = ref('')
+const mcqSelectedPaper = ref('')
+const mcqPaperOptions = ref<PaperGroupOption[]>([])
+
+// In-Memory Catalog State
+const inMemoryCatalog = ref<any[]>([])
+const isCatalogReady = ref(false)
+const isCatalogLoading = ref(false)
+let allFilteredLocalResults: any[] = []
+
+// Search Results & Infinite Scroll State
+const isSearchMode = ref(false)
+const searchActiveType = ref<'SQ' | 'MCQ'>('SQ')
+const searchActiveKeyword = ref('')
+const searchActivePaper = ref('')
+const searchResults = ref<any[]>([])
+const searchTotalCount = ref(0)
+const searchTotalSubCount = ref(0)
+const searchPage = ref(0)
+const isSearching = ref(false)
+const isLoadingMore = ref(false)
+const hasMoreSearch = ref(false)
+const SEARCH_PAGE_SIZE = 10
+const searchExpandedAnswers = ref<Record<string | number, boolean>>({})
+
+export function useQuestionSearch(client?: any, showToast?: (msg: string) => void, getSeries?: () => string) {
   const { t, locale } = useI18n()
-  const sqKeyword = ref('')
-  const sqSelectedPaper = ref('')
-  const sqPaperOptions = ref<PaperGroupOption[]>([])
-
-  const mcqKeyword = ref('')
-  const mcqSelectedPaper = ref('')
-  const mcqPaperOptions = ref<PaperGroupOption[]>([])
-
-  // In-Memory Catalog State
-  const inMemoryCatalog = ref<any[]>([])
-  const isCatalogReady = ref(false)
-  const isCatalogLoading = ref(false)
-  let allFilteredLocalResults: any[] = []
-
-  // Search Results & Infinite Scroll State
-  const isSearchMode = ref(false)
-  const searchActiveType = ref<'SQ' | 'MCQ'>('SQ')
-  const searchActiveKeyword = ref('')
-  const searchActivePaper = ref('')
-  const searchResults = ref<any[]>([])
-  const searchTotalCount = ref(0)
-  const searchTotalSubCount = ref(0)
-  const searchPage = ref(0)
-  const isSearching = ref(false)
-  const isLoadingMore = ref(false)
-  const hasMoreSearch = ref(false)
-  const SEARCH_PAGE_SIZE = 10
-  const searchExpandedAnswers = ref<Record<string | number, boolean>>({})
 
   // Initialize and warm up catalog for the current series
   async function warmUpCatalog(seriesId: string) {
@@ -671,6 +673,12 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
 
   function exitSearchMode() {
     isSearchMode.value = false
+    searchActiveKeyword.value = ''
+    searchActivePaper.value = ''
+    sqKeyword.value = ''
+    mcqKeyword.value = ''
+    sqSelectedPaper.value = ''
+    mcqSelectedPaper.value = ''
   }
 
   return {

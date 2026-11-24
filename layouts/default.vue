@@ -40,6 +40,11 @@ async function signOut() {
           <!-- 当前学科展示与全学科切换菜单（含返回首页全科总览选项） -->
           <TopBarSubjectSwitcher />
         </div>
+
+        <!-- 常驻顶栏中央模式状态胶囊 (默认题库 / 搜题 / 收藏夹) -->
+        <div class="nav-center-group">
+          <TopBarModeIndicator />
+        </div>
         
         <div class="nav-actions">
           <!-- 帮助与功能提示按钮 (i) - 移至弹幕左侧 -->
@@ -194,6 +199,7 @@ async function signOut() {
 }
 
 .nav-container {
+  position: relative;
   width: 100%;
   max-width: 100%;
   height: 56px;
@@ -204,12 +210,28 @@ async function signOut() {
   box-sizing: border-box;
 }
 
+.nav-center-group {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
 @media (max-width: 768px) {
   .nav-container {
     padding: 0 12px;
   }
   .nav-brand-group {
     gap: 8px;
+  }
+  .nav-center-group {
+    position: static;
+    transform: none;
+    flex-shrink: 1;
+    overflow: hidden;
   }
   .nav-actions {
     gap: 6px;
