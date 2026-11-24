@@ -97,6 +97,18 @@ const currentStreamQuestions = computed(() => {
   return poolStore.groupedQuestions.value
 })
 
+// Automatically fetch comments & inject instant danmaku for initial visible stream items
+watch(currentStreamQuestions, (newQuestions) => {
+  if (newQuestions && newQuestions.length > 0) {
+    const toFetch = []
+    newQuestions.slice(0, 8).forEach(item => {
+      const subs = (item.subQuestions && item.subQuestions.length > 0) ? item.subQuestions : [item.primaryQuestion || item]
+      toFetch.push(...subs)
+    })
+    queueFetchComments(toFetch)
+  }
+}, { immediate: true })
+
 const isStreamLoading = computed(() => {
   if (favoritesStore.isFavoriteMode.value) return false
   if (searchStore.isSearchMode.value) return searchStore.isSearching.value
@@ -935,6 +947,7 @@ onUnmounted(() => {
         @search-paper="handleSearchPaper"
         @add-subq-comment="addSubQComment"
         @toggle-like-comment="(c) => danmakuStore.toggleLike(c, client, showToast)"
+        @request-comments="(id, rawNum) => fetchSubQComments(id, rawNum)"
         @subq-image-load="onSubQImageLoad"
       />
     </div>

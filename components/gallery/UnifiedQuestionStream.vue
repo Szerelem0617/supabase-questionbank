@@ -70,6 +70,7 @@ const emit = defineEmits([
   'search-paper',
   'add-subq-comment',
   'toggle-like-comment',
+  'request-comments',
   'subq-image-load'
 ])
 
@@ -274,8 +275,11 @@ function toggleAnswer(subQId) {
   expandedAnswers.value[subQId] = !expandedAnswers.value[subQId]
 }
 
-function toggleComment(subQId) {
+function toggleComment(subQId, rawNum = '') {
   expandedComments.value[subQId] = !expandedComments.value[subQId]
+  if (expandedComments.value[subQId]) {
+    emit('request-comments', subQId, rawNum)
+  }
 }
 
 async function handleCopyStitched(group) {
@@ -382,6 +386,18 @@ defineExpose({
                   <span class="action-icon">💡</span>
                 </button>
 
+                <!-- Toggle Notes & Comments (for MCQ) -->
+                <button 
+                  v-if="group.paper_type === 'MCQ'"
+                  @click="toggleComment(group.id, (group.primaryQuestion || group).question_raw_number)" 
+                  class="btn-card-action"
+                  :class="{ 'btn-action-active': expandedComments[group.id] }"
+                  :title="locale === 'zh' ? '考友讨论与做题笔记' : 'Notes & Discussion'"
+                >
+                  <span class="action-icon">💬</span>
+                  <span v-if="subQComments[group.id]?.length" class="dock-badge-dot">{{ subQComments[group.id].length }}</span>
+                </button>
+
                 <!-- Favorite Whole Question -->
                 <button 
                   @click="emit('toggle-whole-fav', group)" 
@@ -435,11 +451,17 @@ defineExpose({
                 v-else
                 :question="group.primaryQuestion || group"
                 :isAnswerExpanded="expandedAnswers[group.id]"
-                :isFav="isItemFav(group.id)"
+                :isCommentExpanded="expandedComments[group.id]"
+                :comments="subQComments[group.id] || []"
+                :newCommentText="newCommentText"
+                :submittingComment="submittingComment"
                 :cdnBase="cdnBase"
                 :r2DevUrl="r2DevUrl"
                 @toggle-answer="toggleAnswer(group.id)"
+                @toggle-comment="toggleComment(group.id, (group.primaryQuestion || group).question_raw_number)"
                 @toggle-fav="emit('toggle-whole-fav', group)"
+                @toggle-like-comment="(c) => emit('toggle-like-comment', c)"
+                @add-comment="emit('add-subq-comment', group.primaryQuestion || group)"
               />
             </div>
           </div>
@@ -594,6 +616,7 @@ defineExpose({
 }
 
 .btn-card-action {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -607,6 +630,22 @@ defineExpose({
   font-size: 0.94rem;
   transition: all 0.15s ease;
   padding: 0;
+}
+
+.dock-badge-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  background: var(--accent-primary);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 0 4px;
+  line-height: 12px;
+  min-width: 12px;
+  text-align: center;
+  pointer-events: none;
 }
 
 .btn-card-action:hover {
