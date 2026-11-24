@@ -14,7 +14,45 @@ const emit = defineEmits(['close', 'sign-out'])
 
 const { t, locale } = useI18n()
 const user = useSupabaseUser()
+const client = useSupabaseClient()
 const { profile } = useUserProfile()
+
+const isChangingEmail = ref(false)
+const newEmailInput = ref('')
+const emailChangeLoading = ref(false)
+const emailChangeMsg = ref('')
+
+const displayUserId = computed(() => {
+  const raw = user.value?.id || user.value?.sub || ''
+  if (!raw) return '—'
+  return raw.length > 8 ? `${raw.slice(0, 8)}...` : raw
+})
+
+const fullUserId = computed(() => {
+  return user.value?.id || user.value?.sub || ''
+})
+
+async function handleSubmitEmailChange() {
+  const target = newEmailInput.value.trim()
+  if (!target) return
+  if (target === user.value?.email) {
+    alert(locale.value === 'zh' ? '新邮箱不能与当前邮箱相同' : 'New email cannot be the same as current email')
+    return
+  }
+  try {
+    emailChangeLoading.value = true
+    const { error } = await client.auth.updateUser({ email: target })
+    if (error) throw error
+    emailChangeMsg.value = locale.value === 'zh'
+      ? '验证邮件已发送！请前往新邮箱点击确认链接以完成换绑。'
+      : 'Confirmation link sent! Click the link in your new email to verify.'
+    newEmailInput.value = ''
+  } catch (err) {
+    alert(err.message || '换绑失败，请重试')
+  } finally {
+    emailChangeLoading.value = false
+  }
+}
 
 function handleKeyDown(e) {
   if (e.key === 'Escape' && props.isOpen) {
@@ -81,11 +119,42 @@ function handleSignOut() {
               <div class="account-meta-card">
                 <div class="meta-row">
                   <span class="meta-label">{{ locale === 'zh' ? '绑定邮箱' : 'Email' }}</span>
-                  <span class="meta-val">{{ user.email }}</span>
+                  <div class="meta-email-wrap">
+                    <span class="meta-val">{{ user.email }}</span>
+                    <button 
+                      type="button" 
+                      class="btn-meta-action" 
+                      @click="isChangingEmail = !isChangingEmail"
+                    >
+                      {{ isChangingEmail ? (locale === 'zh' ? '取消' : 'Cancel') : (locale === 'zh' ? '换绑' : 'Change') }}
+                    </button>
+                  </div>
                 </div>
+
+                <!-- 换绑轻量内联抽屉 -->
+                <div v-if="isChangingEmail" class="email-change-wrap">
+                  <div class="email-change-inputs">
+                    <input 
+                      type="email" 
+                      v-model="newEmailInput" 
+                      class="input-new-email" 
+                      :placeholder="locale === 'zh' ? '输入新邮箱地址' : 'New email address'"
+                    />
+                    <button 
+                      type="button" 
+                      class="btn-send-email-verify"
+                      :disabled="emailChangeLoading || !newEmailInput.trim()"
+                      @click="handleSubmitEmailChange"
+                    >
+                      {{ emailChangeLoading ? (locale === 'zh' ? '发送中...' : 'Sending...') : (locale === 'zh' ? '发送验证' : 'Send') }}
+                    </button>
+                  </div>
+                  <p v-if="emailChangeMsg" class="email-change-tip">✉️ {{ emailChangeMsg }}</p>
+                </div>
+
                 <div class="meta-row">
                   <span class="meta-label">{{ locale === 'zh' ? '账号 ID' : 'User ID' }}</span>
-                  <code class="meta-code">{{ user.id?.slice(0, 8) }}...</code>
+                  <code class="meta-code" :title="fullUserId">{{ displayUserId }}</code>
                 </div>
               </div>
 
@@ -217,6 +286,90 @@ function handleSignOut() {
   justify-content: space-between;
   align-items: center;
   font-size: 0.8rem;
+}
+
+.meta-email-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-meta-action {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-size: 0.72rem;
+  color: var(--accent-primary);
+  cursor: pointer;
+  background: var(--bg-surface);
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+.btn-meta-action:hover {
+  background: var(--accent-primary-light);
+  border-color: var(--accent-primary);
+}
+
+.email-change-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--bg-surface);
+  border: 1px dashed var(--border-subtle);
+  border-radius: 6px;
+  margin-top: 2px;
+}
+
+.email-change-inputs {
+  display: flex;
+  gap: 6px;
+}
+
+.input-new-email {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--bg-input);
+  font-size: 0.78rem;
+  color: var(--text-main);
+  outline: none;
+}
+
+.input-new-email:focus {
+  border-color: var(--accent-primary);
+}
+
+.btn-send-email-verify {
+  background: var(--accent-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.btn-send-email-verify:hover:not(:disabled) {
+  background: var(--accent-primary-hover);
+}
+
+.btn-send-email-verify:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.email-change-tip {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #16a34a;
+  line-height: 1.35;
 }
 
 .meta-label {
