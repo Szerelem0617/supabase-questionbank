@@ -540,6 +540,12 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
       mcqKeyword.value = `qp:${clean}`
     }
     triggerSearch(type)
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }, 60)
+    }
   }
 
   async function fetchSearchPage(page: number) {

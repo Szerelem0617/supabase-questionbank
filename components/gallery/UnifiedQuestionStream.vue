@@ -371,6 +371,17 @@ defineExpose({
 
               <!-- Header Action Buttons (Icon Only) -->
               <div class="header-actions">
+                <!-- Toggle Answer (for MCQ) -->
+                <button 
+                  v-if="group.paper_type === 'MCQ'"
+                  @click="toggleAnswer(group.id)" 
+                  class="btn-card-action"
+                  :class="{ 'btn-action-active': expandedAnswers[group.id] }"
+                  :title="expandedAnswers[group.id] ? t('favoritesView.hideAnswer') : t('favoritesView.viewAnswer')"
+                >
+                  <span class="action-icon">💡</span>
+                </button>
+
                 <!-- Favorite Whole Question -->
                 <button 
                   @click="emit('toggle-whole-fav', group)" 

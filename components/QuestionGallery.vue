@@ -659,6 +659,12 @@ async function handleCopyStitched(group) {
 
 function handleSearchPaper(paper, type = 'SQ') {
   searchStore.searchPaper(paper, type)
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }, 60)
+  }
 }
 
 function onSelectFolderFromDropdown(folderId) {
