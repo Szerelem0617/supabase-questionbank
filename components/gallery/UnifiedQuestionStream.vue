@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import SqQuestionSheet from './SqQuestionSheet.vue'
 import McqQuestionView from './McqQuestionView.vue'
+import FavoriteCardItem from './FavoriteCardItem.vue'
 import { formatPaperGroupLabel } from '~/composables/usePaperGroup'
 
 const { t, locale } = useI18n()
@@ -476,82 +477,20 @@ defineExpose({
       <template v-else>
         <!-- FAVORITES INDIVIDUAL CARDS (When in favorites mode) -->
         <template v-if="mode === 'favorites'">
-          <div 
+          <FavoriteCardItem
             v-for="(item, idx) in visibleItems" 
             :key="item.id || idx"
-            :id="`stream-card-${idx}`"
-            :data-card-index="idx"
-            :data-fav-id="item.id"
-            class="stream-question-card fav-card"
-            :class="{ 'is-selected-gold': selectedFavId === item.id }"
-            @click="selectedFavId = item.id"
-          >
-            <div class="card-header">
-              <div class="header-tags">
-                <span class="tag tag-series">{{ item.board || 'CAIE' }}</span>
-                <button 
-                  class="tag tag-paper tag-clickable"
-                  @click="emit('search-paper', item.paperFilename, item.paperType || 'SQ')"
-                  :title="`qp:${item.paperFilename}`"
-                >
-                  📄 {{ item.paperFilename }}
-                </button>
-                <span class="tag tag-qnum">
-                  {{ item.isSub ? `Part ${item.subQNum}` : `Q${item.subQNum || ''}` }}
-                </span>
-              </div>
-              <div class="header-actions">
-                <button 
-                  @click="emit('remove-favorite', item)" 
-                  class="btn-card-action btn-fav-active"
-                  :title="t('favoritesView.unfavorite')"
-                >
-                  ★
-                </button>
-                <button 
-                  @click="toggleAnswer(item.id)" 
-                  class="btn-card-action"
-                  :class="{ 'btn-action-active': expandedAnswers[item.id] }"
-                  :title="expandedAnswers[item.id] ? t('favoritesView.hideAnswer') : t('favoritesView.viewAnswer')"
-                >
-                  💡
-                </button>
-              </div>
-            </div>
-
-            <!-- Favorite Card Body -->
-            <div class="card-body">
-              <img 
-                v-if="item.imagePath" 
-                :src="getImageUrl(item.imagePath)" 
-                :alt="item.paperFilename" 
-                class="stream-q-image"
-                loading="eager"
-                decoding="async"
-                @error="(e) => onImageError(e, item.imagePath)"
-              />
-              <p v-else-if="item.details" class="card-text-fallback">{{ item.details }}</p>
-
-              <!-- Mark Scheme Drawer -->
-              <transition name="drawer-slide">
-                <div v-if="expandedAnswers[item.id]" class="stream-ms-drawer">
-                  <div class="ms-drawer-header">
-                    <span>✨ {{ t('singleQuestion.viewMs') }}</span>
-                  </div>
-                  <img 
-                    v-if="item.msImagePath" 
-                    :src="getImageUrl(item.msImagePath)" 
-                    alt="Mark Scheme" 
-                    class="stream-ms-image"
-                    loading="eager"
-                    decoding="async"
-                    @error="(e) => onImageError(e, item.msImagePath)"
-                  />
-                  <div v-else-if="item.msDetails" class="stream-ms-text">{{ item.msDetails }}</div>
-                </div>
-              </transition>
-            </div>
-          </div>
+            :item="item"
+            :index="idx"
+            :isSelected="selectedFavId === item.id"
+            :isExpanded="Boolean(expandedAnswers[item.id])"
+            :cdnBase="props.cdnBase"
+            :r2DevUrl="props.r2DevUrl"
+            @select="selectedFavId = item.id"
+            @search-paper="(paper, type) => emit('search-paper', paper, type)"
+            @remove-favorite="(favItem) => emit('remove-favorite', favItem)"
+            @toggle-answer="(id) => toggleAnswer(id)"
+          />
         </template>
 
         <!-- NORMAL / SEARCH MODE BIG QUESTION CARDS -->
@@ -1134,46 +1073,6 @@ defineExpose({
 
 .card-content-wrap {
   padding: 8px 12px 16px;
-}
-
-/* Favorites card specific styles */
-.fav-card .card-body {
-  padding: 16px 20px;
-}
-
-.stream-q-image {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-  display: block;
-}
-
-.stream-ms-drawer {
-  margin-top: 14px;
-  padding: 14px;
-  background: #fdfaf6;
-  border: 1px dashed var(--accent-primary-border);
-  border-radius: 6px;
-}
-
-.ms-drawer-header {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--accent-primary);
-  margin-bottom: 8px;
-}
-
-.stream-ms-image {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-  display: block;
-}
-
-.stream-ms-text {
-  font-size: 0.88rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
 }
 
 /* Empty State */
