@@ -171,6 +171,18 @@ onUnmounted(() => {
               <template v-else-if="currentContext.id === 'search'">
                 <div class="action-item highlight-action">
                   <div class="action-keys">
+                    <kbd>q1bi</kbd>
+                    <span class="key-sep">/</span>
+                    <kbd>q3 + 词</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '题号精准检索 (加 q 前缀)' : 'Question No. Search (Prefix q)' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '加 q 搜题号（如 q1bi 查第 1 题 b(i) 问，q3 + train 查含列车的第 3 题）；输入纯数字仅匹配题干文本内容。' : 'Prefix q to search question numbers (e.g. q1bi, q3 + train); raw numbers only search question text.' }}</span>
+                  </div>
+                </div>
+
+                <div class="action-item highlight-action">
+                  <div class="action-keys">
                     <kbd>qp:试卷名</kbd>
                   </div>
                   <div class="action-text">

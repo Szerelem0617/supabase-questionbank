@@ -63,12 +63,34 @@ function getMainQuestionNumber(raw: any): string {
   return match ? match[1] : str
 }
 
-interface ParsedQuery {
+function normalizeQNumStr(str: string): string {
+  if (!str) return ''
+  return str.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function matchesSubQuestionNumber(rawQNum: string, targetSubNorm: string): boolean {
+  if (!rawQNum || !targetSubNorm) return false
+  const norm = normalizeQNumStr(rawQNum)
+  if (norm === targetSubNorm) return true
+  if (norm.startsWith(targetSubNorm)) return true
+  // Handle Arabic numeral typed instead of roman (e.g. "q1b1" for "1(b)(i)")
+  const romanVariant = targetSubNorm.replace(/1+$/, (m) => 'i'.repeat(m.length))
+  if (norm === romanVariant || norm.startsWith(romanVariant)) return true
+  return false
+}
+
+export interface QuestionSpecifier {
+  raw: string
+  mainNum: string          // e.g. "1", "3", "37"
+  subNormalized: string    // e.g. "1bi", "1b", "3"
+  isSpecificSub: boolean   // true if subpart like (a), (b)(i) is present
+}
+
+export interface ParsedQuery {
   mode: 'qp' | 'keyword'
   qpQuery?: string
-  tokens: string[]
-  isPureNumber: boolean
-  baseNum: string | null
+  tokens: string[]         // ordinary text tokens (keywords or pure numbers)
+  qSpecifier: QuestionSpecifier | null
   rawQuery: string
 }
 
@@ -80,26 +102,47 @@ function parseSearchQuery(rawKw: string): ParsedQuery {
       mode: 'qp',
       qpQuery: qpArg.toLowerCase(),
       tokens: [],
-      isPureNumber: false,
-      baseNum: null,
+      qSpecifier: null,
       rawQuery: trimmed
     }
   }
 
-  const hasPlus = trimmed.includes('+')
-  const tokens = hasPlus
-    ? trimmed.split('+').map(t => t.trim().toLowerCase()).filter(Boolean)
-    : (trimmed ? [trimmed.toLowerCase()] : [])
+  // Pre-normalize: normalize "q 3", "q:3", "Q 3" into "q3"
+  const preNormalized = trimmed.replace(/\b[qQ][:\s]+(\d)/g, 'q$1')
 
-  const isPureNumber = /^[qQ]?\d+[a-z0-9()]*$/i.test(trimmed)
-  const numMatch = trimmed.match(/^[qQ]?(\d+)/)
-  const baseNum = numMatch ? numMatch[1] : null
+  // Split by '+' or whitespace
+  const rawParts = preNormalized.replace(/\+/g, ' ').split(/\s+/).map(p => p.trim()).filter(Boolean)
+
+  let qSpecifier: QuestionSpecifier | null = null
+  const tokens: string[] = []
+
+  for (const part of rawParts) {
+    const lower = part.toLowerCase()
+    // A question number specifier must start with 'q' followed immediately by digits:
+    // e.g., "q1", "q3", "q37", "q1bi", "q1(b)(i)", "q2a"
+    const qMatch = lower.match(/^q(\d+.*)$/)
+    if (qMatch && !qSpecifier) {
+      const rest = qMatch[1]
+      const mainDigitsMatch = rest.match(/^(\d+)/)
+      const mainNum = mainDigitsMatch ? mainDigitsMatch[1] : ''
+      const subNormalized = normalizeQNumStr(rest)
+      const isSpecificSub = subNormalized.length > mainNum.length
+
+      qSpecifier = {
+        raw: part,
+        mainNum,
+        subNormalized,
+        isSpecificSub
+      }
+    } else {
+      tokens.push(lower)
+    }
+  }
 
   return {
     mode: 'keyword',
     tokens,
-    isPureNumber,
-    baseNum,
+    qSpecifier,
     rawQuery: trimmed
   }
 }
@@ -224,22 +267,36 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
           return pFile.includes(parsed.qpQuery) || pId.includes(parsed.qpQuery)
         }
 
-        if (parsed.tokens.length === 0) return true
-
-        const rawNum = String(item.question_raw_number || '').toLowerCase()
+        const itemRawNum = String(item.question_raw_number || '').toLowerCase()
         const pFile = String(item.paper_filename || '').toLowerCase()
         const details = String(item.details || '').toLowerCase()
         const itemId = String(item.id || '').toLowerCase()
 
-        if (parsed.isPureNumber && parsed.baseNum) {
-          if (rawNum === parsed.baseNum || itemId.includes(`_q${parsed.baseNum}`)) {
-            return true
-          }
+        // 1. If user specified a question number (e.g. q37 or q3)
+        if (parsed.qSpecifier) {
+          const mainNum = parsed.qSpecifier.mainNum
+          const qNumMatch = itemRawNum === mainNum ||
+                            getMainQuestionNumber(itemRawNum) === mainNum ||
+                            itemId.includes(`_q${mainNum}`)
+          if (!qNumMatch) return false
         }
 
-        return parsed.tokens.every(tok =>
-          details.includes(tok) || rawNum.includes(tok) || pFile.includes(tok) || itemId.includes(tok)
-        )
+        // 2. If no tokens and no qSpecifier, match all
+        if (parsed.tokens.length === 0 && !parsed.qSpecifier) return true
+
+        // 3. Match keyword tokens
+        if (parsed.tokens.length > 0) {
+          return parsed.tokens.every(tok => {
+            // Pure number token (e.g. "1" or "37"): matches ONLY inside details text, NEVER question number!
+            const isNum = /^\d+$/.test(tok)
+            if (isNum) {
+              return details.includes(tok)
+            }
+            return details.includes(tok) || pFile.includes(tok) || itemId.includes(tok)
+          })
+        }
+
+        return true
       })
 
       filtered.sort((a, b) => {
@@ -322,54 +379,84 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
             matchedSubQIds = group.subQuestions.map(s => s.id)
           }
         }
-      } else if (parsed.tokens.length === 0) {
+      } else if (parsed.tokens.length === 0 && !parsed.qSpecifier) {
         isGroupMatched = true
         matchedSubQIds = group.subQuestions.map(s => s.id)
-      } else if (parsed.isPureNumber && parsed.baseNum) {
-        const matchesMainNum = group.main_question_number === parsed.baseNum
-        const matchesSubNum = group.subQuestions.some(s => {
-          const raw = String(s.question_raw_number || '').toLowerCase()
-          const idStr = String(s.id || '').toLowerCase()
-          return raw === parsed.baseNum || raw.startsWith(`${parsed.baseNum}(`) || idStr.includes(`_q${parsed.baseNum}`)
-        })
-
-        if (matchesMainNum || matchesSubNum) {
-          isGroupMatched = true
-          const specificMatches = group.subQuestions.filter(s => {
-            const raw = String(s.question_raw_number || '').toLowerCase()
-            const idStr = String(s.id || '').toLowerCase()
-            return raw === parsed.baseNum || raw.startsWith(`${parsed.baseNum}(`) || idStr.includes(`_q${parsed.baseNum}`)
-          })
-          matchedSubQIds = (specificMatches.length > 0 ? specificMatches : group.subQuestions).map(s => s.id)
-        }
       } else {
-        // Keyword mode with tokens (e.g. "gravity + field" or "circular motion")
-        // Check if the big question AS A WHOLE contains all tokens
-        const combinedText = group.subQuestions.map(s => 
-          `${s.details || ''} ${s.question_raw_number || ''} ${s.paper_filename || ''} ${s.id || ''}`
-        ).join(' ').toLowerCase()
+        // Step 1: Question Specifier Check (e.g. q3, q1bi)
+        if (parsed.qSpecifier) {
+          if (group.main_question_number !== parsed.qSpecifier.mainNum) {
+            continue
+          }
 
-        const groupMatchesAllTokens = parsed.tokens.every(tok => combinedText.includes(tok))
+          if (parsed.qSpecifier.isSpecificSub) {
+            const specificSubs = group.subQuestions.filter(s =>
+              matchesSubQuestionNumber(s.question_raw_number, parsed.qSpecifier!.subNormalized)
+            )
+            if (specificSubs.length === 0) {
+              continue
+            }
+            matchedSubQIds = specificSubs.map(s => s.id)
+          } else {
+            matchedSubQIds = group.subQuestions.map(s => s.id)
+          }
+        }
 
-        if (groupMatchesAllTokens) {
-          isGroupMatched = true
-          // Identify which individual sub-questions contributed to matching
-          // 1. First, check if any sub-question matches ALL tokens
-          const subsMatchingAll = group.subQuestions.filter(s => {
-            const sText = `${s.details || ''} ${s.question_raw_number || ''} ${s.paper_filename || ''} ${s.id || ''}`.toLowerCase()
-            return parsed.tokens.every(tok => sText.includes(tok))
+        // Step 2: Keyword tokens check (e.g. "train" in "q3 + train" or "1" in "1")
+        if (parsed.tokens.length > 0) {
+          // Check if big question contains all tokens
+          // Pure numbers (e.g. "1", "37") match ONLY inside details text, NEVER question number!
+          const groupMatchesAllTokens = parsed.tokens.every(tok => {
+            const isNum = /^\d+$/.test(tok)
+            return group.subQuestions.some(s => {
+              const details = String(s.details || '').toLowerCase()
+              if (isNum) {
+                return details.includes(tok)
+              }
+              const pFile = String(s.paper_filename || '').toLowerCase()
+              const sId = String(s.id || '').toLowerCase()
+              return details.includes(tok) || pFile.includes(tok) || sId.includes(tok)
+            })
           })
 
-          if (subsMatchingAll.length > 0) {
-            matchedSubQIds = subsMatchingAll.map(s => s.id)
-          } else {
-            // Tokens are spread across multiple sub-questions; highlight all sub-questions matching ANY token
-            const subsMatchingAny = group.subQuestions.filter(s => {
-              const sText = `${s.details || ''} ${s.question_raw_number || ''} ${s.paper_filename || ''} ${s.id || ''}`.toLowerCase()
-              return parsed.tokens.some(tok => sText.includes(tok))
-            })
-            matchedSubQIds = subsMatchingAny.map(s => s.id)
+          if (!groupMatchesAllTokens) {
+            continue
           }
+
+          // If keyword matched, refine matchedSubQIds to sub-questions that actually contain the keyword tokens
+          const candidateSubs = (parsed.qSpecifier && parsed.qSpecifier.isSpecificSub)
+            ? group.subQuestions.filter(s => matchedSubQIds.includes(s.id))
+            : group.subQuestions
+
+          const subsMatchingTokens = candidateSubs.filter(s => {
+            const details = String(s.details || '').toLowerCase()
+            const pFile = String(s.paper_filename || '').toLowerCase()
+            const sId = String(s.id || '').toLowerCase()
+            return parsed.tokens.every(tok => {
+              const isNum = /^\d+$/.test(tok)
+              if (isNum) return details.includes(tok)
+              return details.includes(tok) || pFile.includes(tok) || sId.includes(tok)
+            })
+          })
+
+          if (subsMatchingTokens.length > 0) {
+            matchedSubQIds = subsMatchingTokens.map(s => s.id)
+          } else {
+            const subsMatchingAny = candidateSubs.filter(s => {
+              const details = String(s.details || '').toLowerCase()
+              return parsed.tokens.some(tok => details.includes(tok))
+            })
+            if (subsMatchingAny.length > 0) {
+              matchedSubQIds = subsMatchingAny.map(s => s.id)
+            } else if (matchedSubQIds.length === 0) {
+              matchedSubQIds = group.subQuestions.map(s => s.id)
+            }
+          }
+        }
+
+        isGroupMatched = true
+        if (matchedSubQIds.length === 0) {
+          matchedSubQIds = group.subQuestions.map(s => s.id)
         }
       }
 
@@ -486,16 +573,23 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
 
       if (parsed.mode === 'qp' && parsed.qpQuery) {
         query = query.or(`paper_filename.ilike.%${parsed.qpQuery}%,id.ilike.%${parsed.qpQuery}%`)
-      } else if (parsed.tokens.length > 0) {
-        if (parsed.isPureNumber && parsed.baseNum) {
-          query = query.or(`question_raw_number.eq.${parsed.baseNum},question_raw_number.ilike.${parsed.baseNum}(%,id.ilike.%_q${parsed.baseNum}%`)
-        } else {
-          if (parsed.tokens.length === 1) {
-            const kw = parsed.tokens[0]
-            query = query.or(`id.ilike.%${kw}%,paper_filename.ilike.%${kw}%,details.ilike.%${kw}%`)
+      } else {
+        if (parsed.qSpecifier) {
+          const mainNum = parsed.qSpecifier.mainNum
+          if (parsed.qSpecifier.isSpecificSub) {
+            query = query.or(`question_raw_number.ilike.${mainNum}(%,id.ilike.%_q${mainNum}%`)
           } else {
-            const wildcardJoined = parsed.tokens.join('%')
-            query = query.or(`id.ilike.%${wildcardJoined}%,paper_filename.ilike.%${wildcardJoined}%,details.ilike.%${wildcardJoined}%`)
+            query = query.or(`question_raw_number.eq.${mainNum},question_raw_number.ilike.${mainNum}(%,id.ilike.%_q${mainNum}%`)
+          }
+        }
+        if (parsed.tokens.length > 0) {
+          for (const tok of parsed.tokens) {
+            const isNum = /^\d+$/.test(tok)
+            if (isNum) {
+              query = query.ilike('details', `%${tok}%`)
+            } else {
+              query = query.or(`id.ilike.%${tok}%,paper_filename.ilike.%${tok}%,details.ilike.%${tok}%`)
+            }
           }
         }
       }
