@@ -229,12 +229,23 @@ onUnmounted(() => {
                     <kbd>&rarr;</kbd>
                   </div>
                   <div class="action-text">
-                    <span class="action-name">{{ locale === 'zh' ? '键盘快速翻卷 / 翻题' : 'Quick Question Switch' }}</span>
-                    <span class="action-desc">{{ locale === 'zh' ? '左右方向键快速切换试卷或连续大题，无需频繁触碰鼠标。' : 'Use ArrowLeft/ArrowRight to flip between questions or papers.' }}</span>
+                    <span class="action-name">{{ locale === 'zh' ? '左右键：快速切换大题' : 'Left/Right: Switch Big Question' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '左右方向键在连续大题或试卷间快速跳转。' : 'Use ArrowLeft/ArrowRight to jump between consecutive big questions.' }}</span>
                   </div>
                 </div>
 
                 <div class="action-item highlight-action">
+                  <div class="action-keys">
+                    <kbd>&uarr;</kbd>
+                    <kbd>&darr;</kbd>
+                  </div>
+                  <div class="action-text">
+                    <span class="action-name">{{ locale === 'zh' ? '上下键：逐个切换小问' : 'Up/Down: Step Through Sub-questions' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '上下方向键（或 K/J）依次精准定位并高亮各个子小问。' : 'Use ArrowUp/ArrowDown (or K/J) to smoothly snap and focus through sub-parts.' }}</span>
+                  </div>
+                </div>
+
+                <div class="action-item">
                   <div class="action-keys">
                     <kbd>📋</kbd>
                   </div>

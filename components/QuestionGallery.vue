@@ -437,18 +437,154 @@ const isNavNextDisabled = computed(() => {
   return currentStreamQuestions.value.length === 0
 })
 
+// 6. Sub-question Navigation (上下键逐小问快速跳转)
+function getAllSubQuestionElements() {
+  if (typeof document === 'undefined') return []
+  const cards = Array.from(document.querySelectorAll('.stream-question-card'))
+  const targets = []
+  for (const card of cards) {
+    const subRows = Array.from(card.querySelectorAll('.subq-row-container'))
+    if (subRows.length > 0) {
+      targets.push(...subRows)
+    } else {
+      targets.push(card)
+    }
+  }
+  return targets
+}
+
+function handleSubQNext() {
+  if (typeof document === 'undefined') return
+  const targets = getAllSubQuestionElements()
+  if (!targets.length) return
+
+  // 寻找视口中线偏上基准线以下的首个小题
+  const nextSubQ = targets.find(el => {
+    const rect = el.getBoundingClientRect()
+    return rect.top > 120
+  })
+
+  if (nextSubQ) {
+    const rect = nextSubQ.getBoundingClientRect()
+    const targetY = window.scrollY + rect.top - 85
+    window.scrollTo({
+      top: Math.max(0, targetY),
+      behavior: 'smooth'
+    })
+
+    // 轻柔脉冲高亮当前聚焦小问
+    nextSubQ.classList.remove('subq-focus-highlight')
+    void nextSubQ.offsetWidth
+    nextSubQ.classList.add('subq-focus-highlight')
+    setTimeout(() => nextSubQ.classList.remove('subq-focus-highlight'), 1800)
+
+    const cardParent = nextSubQ.closest('.stream-question-card') || nextSubQ
+    const cards = Array.from(document.querySelectorAll('.stream-question-card'))
+    const cardIdx = cards.indexOf(cardParent)
+    if (cardIdx >= cards.length - 3) {
+      if (searchStore.isSearchMode.value && searchStore.hasMoreSearch.value && !searchStore.isLoadingMore.value) {
+        searchStore.loadMoreSearchResults()
+      }
+      unifiedStreamRef.value?.loadMoreItems()
+    }
+  } else {
+    if (searchStore.isSearchMode.value && searchStore.hasMoreSearch.value && !searchStore.isLoadingMore.value) {
+      searchStore.loadMoreSearchResults()
+    }
+    unifiedStreamRef.value?.loadMoreItems()
+  }
+}
+
+function handleSubQPrev() {
+  if (typeof document === 'undefined') return
+  const targets = getAllSubQuestionElements()
+  if (!targets.length) return
+
+  let prevSubQ = null
+  for (let i = targets.length - 1; i >= 0; i--) {
+    const rect = targets[i].getBoundingClientRect()
+    if (rect.top < 70) {
+      prevSubQ = targets[i]
+      break
+    }
+  }
+
+  if (prevSubQ) {
+    const rect = prevSubQ.getBoundingClientRect()
+    const targetY = window.scrollY + rect.top - 85
+    window.scrollTo({
+      top: Math.max(0, targetY),
+      behavior: 'smooth'
+    })
+
+    prevSubQ.classList.remove('subq-focus-highlight')
+    void prevSubQ.offsetWidth
+    prevSubQ.classList.add('subq-focus-highlight')
+    setTimeout(() => prevSubQ.classList.remove('subq-focus-highlight'), 1800)
+  } else {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    })
+  }
+}
+
+// 7. 聚焦搜索输入框
+function focusSearchInput() {
+  if (typeof document === 'undefined') return
+  const isMcq = searchStore.searchActiveType.value === 'MCQ'
+  const targetSelector = isMcq 
+    ? '.search-row-mcq .compact-input, .search-row-sq .compact-input' 
+    : '.search-row-sq .compact-input, .search-row-mcq .compact-input'
+  const input = document.querySelector(targetSelector) || document.querySelector('.compact-input')
+  if (input) {
+    input.focus()
+    input.select()
+    const rect = input.getBoundingClientRect()
+    if (rect.top < 60 || rect.bottom > window.innerHeight) {
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+}
+
 function handleKeyDown(e) {
   if (typeof document === 'undefined') return
-  const tag = document.activeElement?.tagName
+  // 如果用户当前正在文本框或编辑器中输入，不触发全局快捷键
+  const tag = (document.activeElement?.tagName || '').toUpperCase()
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) {
     return
   }
+
+  // 模态弹窗打开状态下不触发主做题流导航
+  if (document.querySelector('.help-modal-backdrop, .user-drawer-backdrop, .auth-modal-backdrop')) {
+    return
+  }
+
+  // 1. 斜杠 (/): 快速聚焦搜索栏（阻止斜杠输入到输入框中）
+  if (e.key === '/' || e.code === 'Slash') {
+    e.preventDefault()
+    focusSearchInput()
+    return
+  }
+
+  // 2. 左右方向键：快速切换大题
   if (e.key === 'ArrowLeft') {
     e.preventDefault()
     handleNavPrev()
   } else if (e.key === 'ArrowRight') {
     e.preventDefault()
     handleNavNext()
+  } 
+  // 3. 上下方向键（或 k / j）：平滑切换小问
+  else if (e.key === 'ArrowUp' || e.key === 'k') {
+    // 收藏夹模式金框选中时，保留给卡片上下移动排序
+    if (document.querySelector('.fav-card.is-selected-gold')) return
+    e.preventDefault()
+    handleSubQPrev()
+  } else if (e.key === 'ArrowDown' || e.key === 'j') {
+    if (document.querySelector('.fav-card.is-selected-gold')) return
+    e.preventDefault()
+    handleSubQNext()
   }
 }
 

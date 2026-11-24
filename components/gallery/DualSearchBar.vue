@@ -29,6 +29,7 @@ const emit = defineEmits(['search'])
           :placeholder="t('search.sqPlaceholder')"
           class="compact-input"
           @keyup.enter="emit('search', 'SQ')"
+          @keydown.esc="$event.target.blur()"
         />
         <button v-if="sqKeyword" @click="sqKeyword = ''" class="clear-btn">&times;</button>
       </div>
@@ -63,6 +64,7 @@ const emit = defineEmits(['search'])
           :placeholder="t('search.mcqPlaceholder')"
           class="compact-input"
           @keyup.enter="emit('search', 'MCQ')"
+          @keydown.esc="$event.target.blur()"
         />
         <button v-if="mcqKeyword" @click="mcqKeyword = ''" class="clear-btn">&times;</button>
       </div>
