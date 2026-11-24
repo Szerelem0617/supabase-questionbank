@@ -1,4 +1,6 @@
 <script setup>
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+
 const { t, locale } = useI18n()
 
 const props = defineProps({
@@ -14,6 +16,83 @@ const mcqKeyword = defineModel('mcqKeyword', { type: String, default: '' })
 const mcqSelectedPaper = defineModel('mcqSelectedPaper', { type: String, default: '' })
 
 const emit = defineEmits(['search'])
+
+// Dropdown open states
+const isSqDropdownOpen = ref(false)
+const isMcqDropdownOpen = ref(false)
+
+const sqDropdownRef = ref(null)
+const mcqDropdownRef = ref(null)
+
+// Current selected label for SQ
+const selectedSqLabel = computed(() => {
+  if (!sqSelectedPaper.value) {
+    return locale.value === 'zh' ? '全部卷种' : 'All Papers'
+  }
+  const match = props.sqPaperOptions.find(opt => (opt.value || opt) === sqSelectedPaper.value)
+  return match ? (match.label || match.value || match) : sqSelectedPaper.value
+})
+
+// Current selected label for MCQ
+const selectedMcqLabel = computed(() => {
+  if (!mcqSelectedPaper.value) {
+    return locale.value === 'zh' ? '全部卷种' : 'All Papers'
+  }
+  const match = props.mcqPaperOptions.find(opt => (opt.value || opt) === mcqSelectedPaper.value)
+  return match ? (match.label || match.value || match) : mcqSelectedPaper.value
+})
+
+function toggleSqDropdown() {
+  isSqDropdownOpen.value = !isSqDropdownOpen.value
+  isMcqDropdownOpen.value = false
+}
+
+function toggleMcqDropdown() {
+  isMcqDropdownOpen.value = !isMcqDropdownOpen.value
+  isSqDropdownOpen.value = false
+}
+
+function selectSqPaper(val) {
+  sqSelectedPaper.value = val
+  isSqDropdownOpen.value = false
+  emit('search', 'SQ')
+}
+
+function selectMcqPaper(val) {
+  mcqSelectedPaper.value = val
+  isMcqDropdownOpen.value = false
+  emit('search', 'MCQ')
+}
+
+function handleGlobalClick(e) {
+  if (sqDropdownRef.value && !sqDropdownRef.value.contains(e.target)) {
+    isSqDropdownOpen.value = false
+  }
+  if (mcqDropdownRef.value && !mcqDropdownRef.value.contains(e.target)) {
+    isMcqDropdownOpen.value = false
+  }
+}
+
+function handleKeyDown(e) {
+  if (e.key === 'Escape') {
+    isSqDropdownOpen.value = false
+    isMcqDropdownOpen.value = false
+  }
+}
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    document.addEventListener('click', handleGlobalClick)
+    window.addEventListener('keydown', handleKeyDown)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    document.removeEventListener('click', handleGlobalClick)
+    window.removeEventListener('keydown', handleKeyDown)
+  }
+})
 </script>
 
 <template>
@@ -33,17 +112,44 @@ const emit = defineEmits(['search'])
         />
         <button v-if="sqKeyword" @click="sqKeyword = ''" class="clear-btn">&times;</button>
       </div>
-      <select 
-        v-model="sqSelectedPaper" 
-        class="paper-dropdown" 
-        :title="t('search.sqPaperPlaceholder')"
-        @change="emit('search', 'SQ')"
-      >
-        <option value="">{{ locale === 'zh' ? '全部卷种' : 'All Papers' }}</option>
-        <option v-for="opt in sqPaperOptions" :key="opt.value || opt" :value="opt.value || opt">
-          {{ opt.label || opt.value || opt }}
-        </option>
-      </select>
+
+      <!-- Custom Downward Paper Dropdown for SQ -->
+      <div class="custom-select-wrapper" ref="sqDropdownRef">
+        <button 
+          type="button" 
+          class="custom-select-trigger" 
+          :class="{ 'is-open': isSqDropdownOpen }"
+          @click="toggleSqDropdown"
+          :title="t('search.sqPaperPlaceholder')"
+        >
+          <span class="trigger-text">{{ selectedSqLabel }}</span>
+          <span class="trigger-caret" :class="{ 'caret-up': isSqDropdownOpen }">▾</span>
+        </button>
+
+        <transition name="dropdown-slide">
+          <div v-if="isSqDropdownOpen" class="custom-dropdown-menu">
+            <div 
+              class="custom-dropdown-item" 
+              :class="{ 'is-selected': !sqSelectedPaper }"
+              @click="selectSqPaper('')"
+            >
+              <span>{{ locale === 'zh' ? '全部卷种' : 'All Papers' }}</span>
+              <span v-if="!sqSelectedPaper" class="item-check">✓</span>
+            </div>
+            <div 
+              v-for="opt in sqPaperOptions" 
+              :key="opt.value || opt"
+              class="custom-dropdown-item"
+              :class="{ 'is-selected': sqSelectedPaper === (opt.value || opt) }"
+              @click="selectSqPaper(opt.value || opt)"
+            >
+              <span>{{ opt.label || opt.value || opt }}</span>
+              <span v-if="sqSelectedPaper === (opt.value || opt)" class="item-check">✓</span>
+            </div>
+          </div>
+        </transition>
+      </div>
+
       <button 
         @click="emit('search', 'SQ')" 
         :disabled="isSearching && searchActiveType === 'SQ'" 
@@ -68,17 +174,44 @@ const emit = defineEmits(['search'])
         />
         <button v-if="mcqKeyword" @click="mcqKeyword = ''" class="clear-btn">&times;</button>
       </div>
-      <select 
-        v-model="mcqSelectedPaper" 
-        class="paper-dropdown" 
-        :title="t('search.mcqPaperPlaceholder')"
-        @change="emit('search', 'MCQ')"
-      >
-        <option value="">{{ locale === 'zh' ? '全部卷种' : 'All Papers' }}</option>
-        <option v-for="opt in mcqPaperOptions" :key="opt.value || opt" :value="opt.value || opt">
-          {{ opt.label || opt.value || opt }}
-        </option>
-      </select>
+
+      <!-- Custom Downward Paper Dropdown for MCQ -->
+      <div class="custom-select-wrapper" ref="mcqDropdownRef">
+        <button 
+          type="button" 
+          class="custom-select-trigger" 
+          :class="{ 'is-open': isMcqDropdownOpen }"
+          @click="toggleMcqDropdown"
+          :title="t('search.mcqPaperPlaceholder')"
+        >
+          <span class="trigger-text">{{ selectedMcqLabel }}</span>
+          <span class="trigger-caret" :class="{ 'caret-up': isMcqDropdownOpen }">▾</span>
+        </button>
+
+        <transition name="dropdown-slide">
+          <div v-if="isMcqDropdownOpen" class="custom-dropdown-menu">
+            <div 
+              class="custom-dropdown-item" 
+              :class="{ 'is-selected': !mcqSelectedPaper }"
+              @click="selectMcqPaper('')"
+            >
+              <span>{{ locale === 'zh' ? '全部卷种' : 'All Papers' }}</span>
+              <span v-if="!mcqSelectedPaper" class="item-check">✓</span>
+            </div>
+            <div 
+              v-for="opt in mcqPaperOptions" 
+              :key="opt.value || opt"
+              class="custom-dropdown-item"
+              :class="{ 'is-selected': mcqSelectedPaper === (opt.value || opt) }"
+              @click="selectMcqPaper(opt.value || opt)"
+            >
+              <span>{{ opt.label || opt.value || opt }}</span>
+              <span v-if="mcqSelectedPaper === (opt.value || opt)" class="item-check">✓</span>
+            </div>
+          </div>
+        </transition>
+      </div>
+
       <button 
         @click="emit('search', 'MCQ')" 
         :disabled="isSearching && searchActiveType === 'MCQ'" 
@@ -182,21 +315,113 @@ const emit = defineEmits(['search'])
   color: var(--text-main);
 }
 
-.paper-dropdown {
+/* Custom Downward Dropdown Wrapper */
+.custom-select-wrapper {
+  position: relative;
+  min-width: 130px;
+  max-width: 190px;
+}
+
+.custom-select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 6px 10px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-base);
   font-size: 0.8rem;
   color: var(--text-main);
   background: var(--bg-input);
-  outline: none;
-  max-width: 190px;
   cursor: pointer;
-  transition: border-color 0.16s ease;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
-.paper-dropdown:focus {
+.custom-select-trigger:hover,
+.custom-select-trigger.is-open {
   border-color: var(--border-focus);
+  background: var(--bg-surface);
+}
+
+.trigger-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trigger-caret {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  transition: transform 0.18s ease;
+  flex-shrink: 0;
+}
+
+.trigger-caret.caret-up {
+  transform: rotate(180deg);
+}
+
+/* 下拉菜单面板：严格从触发器正下方自然伸出 */
+.custom-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: 240px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-base);
+  box-shadow: 0 8px 24px rgba(44, 47, 50, 0.12), 0 2px 6px rgba(44, 47, 50, 0.04);
+  padding: 4px;
+  z-index: 100;
+  box-sizing: border-box;
+}
+
+.custom-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+
+.custom-dropdown-item:hover {
+  background: var(--accent-primary-light);
+  color: var(--accent-primary);
+}
+
+.custom-dropdown-item.is-selected {
+  font-weight: 700;
+  color: var(--accent-primary);
+  background: rgba(194, 65, 40, 0.06);
+}
+
+.item-check {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
+.dropdown-slide-enter-active,
+.dropdown-slide-leave-active {
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dropdown-slide-enter-from,
+.dropdown-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 .btn-search {
@@ -250,13 +475,11 @@ const emit = defineEmits(['search'])
     flex: 1 1 calc(100% - 60px);
     min-width: 140px;
   }
-  .paper-dropdown {
+  .custom-select-wrapper {
     order: 3;
     flex: 1 1 auto;
     min-width: 0;
     max-width: none;
-    font-size: 0.78rem;
-    padding: 6px 8px;
   }
   .btn-search {
     order: 4;
@@ -265,4 +488,3 @@ const emit = defineEmits(['search'])
   }
 }
 </style>
-

@@ -242,7 +242,7 @@ onUnmounted(() => {
                   </div>
                   <div class="action-text">
                     <span class="action-name">{{ locale === 'zh' ? '上下键：逐个定位小问' : 'Up/Down: Step Through Sub-questions' }}</span>
-                    <span class="action-desc">{{ locale === 'zh' ? '键盘上下键（或 K/J）依次精准定位并高亮子小问。' : 'Use ArrowUp/ArrowDown (or K/J) to smoothly snap and focus through sub-parts.' }}</span>
+                    <span class="action-desc">{{ locale === 'zh' ? '键盘上下键（或 K/J）依次精准定位各个子小问。' : 'Use ArrowUp/ArrowDown (or K/J) to smoothly snap and focus through sub-parts.' }}</span>
                   </div>
                 </div>
 
@@ -308,16 +308,6 @@ onUnmounted(() => {
                 <div class="action-text">
                   <span class="action-name">{{ locale === 'zh' ? '聚焦搜索框' : 'Focus Search Bar' }}</span>
                   <span class="action-desc">{{ locale === 'zh' ? '任意时刻按下斜杠键，光标立即定位到搜题输入框。' : 'Press slash anytime to activate the search box.' }}</span>
-                </div>
-              </div>
-
-              <div class="action-item">
-                <div class="action-keys">
-                  <kbd>ESC</kbd>
-                </div>
-                <div class="action-text">
-                  <span class="action-name">{{ locale === 'zh' ? '退出与取消选中' : 'Dismiss / Deselect' }}</span>
-                  <span class="action-desc">{{ locale === 'zh' ? '关闭帮助弹窗、侧边栏，或取消卡片金框选中。' : 'Close modal, drawers, or deselect highlighted card.' }}</span>
                 </div>
               </div>
 
