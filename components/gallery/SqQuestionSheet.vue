@@ -513,5 +513,36 @@ function onImageError(e, path) {
 .notes-input-row input:focus {
   border-color: var(--border-focus);
 }
+
+@media (max-width: 768px) {
+  .subq-main-row {
+    flex-direction: column;
+  }
+  .subq-img-wrap {
+    width: 100%;
+  }
+  .subq-action-dock,
+  .subq-action-dock.dock-horizontal {
+    width: 100%;
+    min-width: 0;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    border-left: none;
+    border-top: 1px dashed var(--border-subtle);
+    padding: 6px 10px;
+    gap: 12px;
+  }
+  .dock-btn {
+    width: 32px;
+    height: 32px;
+  }
+  .subq-ms-drawer {
+    padding: 8px 10px 12px;
+  }
+  .subq-notes-drawer {
+    padding: 10px 12px;
+  }
+}
 </style>
 

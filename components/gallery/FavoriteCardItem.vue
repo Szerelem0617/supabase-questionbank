@@ -304,4 +304,23 @@ function onImageError(e, path) {
   padding-top: 0;
   padding-bottom: 0;
 }
+
+@media (max-width: 768px) {
+  .card-header {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .fav-card .card-body {
+    padding: 6px 4px 10px;
+  }
+  .btn-card-action {
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
+  }
+  .tag {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+  }
+}
 </style>

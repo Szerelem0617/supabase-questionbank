@@ -681,6 +681,25 @@ defineExpose({
     order: 3;
     width: 100%;
   }
+  .stream-cards-container {
+    gap: 14px;
+  }
+  .card-header {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .card-content-wrap {
+    padding: 3px 2px 6px;
+  }
+  .tag {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+  }
+  .btn-card-action {
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
+  }
 }
 </style>
 

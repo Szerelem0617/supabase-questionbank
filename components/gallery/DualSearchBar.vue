@@ -232,5 +232,37 @@ const emit = defineEmits(['search'])
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+@media (max-width: 640px) {
+  .dual-search-container {
+    padding: 10px 10px;
+    gap: 10px;
+  }
+  .search-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .type-pill {
+    order: 1;
+  }
+  .search-input-box {
+    order: 2;
+    flex: 1 1 calc(100% - 60px);
+    min-width: 140px;
+  }
+  .paper-dropdown {
+    order: 3;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    font-size: 0.78rem;
+    padding: 6px 8px;
+  }
+  .btn-search {
+    order: 4;
+    flex-shrink: 0;
+    padding: 6px 14px;
+  }
+}
 </style>
 

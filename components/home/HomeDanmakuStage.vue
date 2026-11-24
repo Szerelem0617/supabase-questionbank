@@ -215,4 +215,10 @@ onMounted(() => {
     right: 0;
   }
 }
+
+@media (max-width: 768px) {
+  .home-ambient-stage {
+    display: none !important;
+  }
+}
 </style>

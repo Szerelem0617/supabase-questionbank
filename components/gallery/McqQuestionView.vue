@@ -205,5 +205,29 @@ function onImageError(e, path) {
   font-weight: 800;
   color: var(--accent-primary);
 }
+
+@media (max-width: 768px) {
+  .mcq-main-row {
+    flex-direction: column;
+  }
+  .mcq-img-wrap {
+    width: 100%;
+  }
+  .subq-action-dock {
+    width: 100%;
+    min-width: 0;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    border-left: none;
+    border-top: 1px dashed var(--border-subtle);
+    padding: 6px 10px;
+    gap: 12px;
+  }
+  .dock-btn {
+    width: 32px;
+    height: 32px;
+  }
+}
 </style>
 

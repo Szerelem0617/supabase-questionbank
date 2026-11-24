@@ -85,4 +85,20 @@ useSeoMeta({
   font-weight: 700;
   letter-spacing: -0.01em;
 }
+
+@media (max-width: 768px) {
+  .subject-container {
+    padding: 10px 4px 36px;
+  }
+  .header {
+    margin-bottom: 12px;
+    padding: 0 4px;
+  }
+  .title {
+    font-size: 1.35rem;
+  }
+  .subject-indicator {
+    height: 20px;
+  }
+}
 </style>
