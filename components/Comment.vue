@@ -31,8 +31,7 @@ async function fetchMessages() {
         user_id,
         profiles (
           display_name,
-          avatar_url,
-          website
+          avatar_url
         )
       `)
       .order('created_at', { ascending: false })
@@ -89,8 +88,7 @@ onMounted(() => {
             id, created_at, message, user_id,
             profiles (
               display_name,
-              avatar_url,
-              website
+              avatar_url
             )
           `)
           .eq('id', payload.new.id)
@@ -144,10 +142,7 @@ onUnmounted(() => {
             alt="avatar" 
             class="author-avatar"
           />
-          <a v-if="msg.profiles?.website" :href="msg.profiles.website" target="_blank" rel="noopener noreferrer" class="author-name-link">
-            <span class="author-name">{{ getAuthorDisplayName(msg) }}</span>
-          </a>
-          <span v-else class="author-name">{{ getAuthorDisplayName(msg) }}</span>
+          <span class="author-name">{{ getAuthorDisplayName(msg) }}</span>
         </div>
         <p class="message-content">{{ msg.message }}</p>
         <span class="message-time">{{ new Date(msg.created_at).toLocaleString() }}</span>

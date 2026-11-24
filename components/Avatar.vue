@@ -5,21 +5,18 @@ const { t, locale } = useI18n()
 const { profile, loading, fetchProfile, updateProfile, uploadAvatar } = useUserProfile()
 
 const displayName = ref('')
-const website = ref('')
 const saveStatus = ref('')
 
 onMounted(async () => {
     await fetchProfile()
     if (profile.value) {
         displayName.value = profile.value.display_name || ''
-        website.value = profile.value.website || ''
     }
 })
 
 watch(profile, (newVal) => {
     if (newVal) {
         displayName.value = newVal.display_name || ''
-        website.value = newVal.website || ''
     }
 })
 
@@ -40,8 +37,7 @@ async function handleUpload(event) {
 
 async function handleUpdateProfile() {
   await updateProfile({ 
-    displayName: displayName.value, 
-    website: website.value 
+    displayName: displayName.value 
   })
   saveStatus.value = locale.value === 'zh' ? '资料已保存！' : 'Profile updated!'
   setTimeout(() => {
@@ -74,7 +70,7 @@ async function handleUpdateProfile() {
       </div>
     </div>
 
-    <!-- 资料表单直接展示，无需点击切换 -->
+    <!-- 资料表单直接展示：精简仅保留昵称，清爽高效 -->
     <div class="profile-form">
       <h3>{{ locale === 'zh' ? '个人信息' : 'Personal Information' }}</h3>
       <div class="form-group">
@@ -83,14 +79,6 @@ async function handleUpdateProfile() {
           type="text" 
           v-model="displayName" 
           :placeholder="locale === 'zh' ? '输入你的昵称' : 'Enter your display name'"
-        />
-      </div>
-      <div class="form-group">
-        <label>{{ locale === 'zh' ? '个人主页 / 简介链接' : 'Website / Profile URL' }}</label>
-        <input 
-          type="url" 
-          v-model="website" 
-          :placeholder="locale === 'zh' ? 'https://...' : 'https://...'"
         />
       </div>
       <div class="form-actions">

@@ -23,7 +23,7 @@ export const useUserProfile = () => {
 
       const { data, error } = await client
         .from('profiles')
-        .select(`username, website, avatar_url, display_name`)
+        .select(`username, avatar_url, display_name`)
         .eq('id', currentUser.id)
         .single()
 
@@ -48,7 +48,7 @@ export const useUserProfile = () => {
   }
 
   // --- Update Profile Info ---
-  const updateProfile = async (profileData: { displayName: string, website: string }) => {
+  const updateProfile = async (profileData: { displayName: string }) => {
     try {
       loading.value = true
       
@@ -59,7 +59,6 @@ export const useUserProfile = () => {
       const updates = {
         id: currentUser.id,
         display_name: profileData.displayName,
-        website: profileData.website,
         updated_at: new Date(),
       }
 
@@ -70,17 +69,14 @@ export const useUserProfile = () => {
       // Optimistic Update
       if (profile.value) {
         profile.value.display_name = profileData.displayName
-        profile.value.website = profileData.website
       } else {
         profile.value = {
             username: currentUser.email?.split('@')[0],
             avatar_url: '',
             display_name: profileData.displayName,
-            website: profileData.website,
             email: currentUser.email
         }
       }
-      alert('Profile updated successfully!')
     } catch (error: any) {
       alert(`Database Error: ${error.message}`)
     } finally {
@@ -136,7 +132,6 @@ export const useUserProfile = () => {
              ...profileUpdates,
              email: currentUser.email,
              display_name: '', // Default
-             website: '',      // Default
              username: currentUser.email?.split('@')[0]
          }
       }
