@@ -370,13 +370,13 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
       if (parsed.mode === 'qp') {
         if (!parsed.qpQuery) {
           isGroupMatched = true
-          matchedSubQIds = group.subQuestions.map(s => s.id)
+          matchedSubQIds = [] // 卷号搜索全套卷：不为小题添加金色高亮框，呈现纯净真题样式
         } else {
           const pFile = String(group.paper_filename || '').toLowerCase()
           const matchesPaper = pFile.includes(parsed.qpQuery) || group.subQuestions.some(s => String(s.id || '').toLowerCase().includes(parsed.qpQuery!))
           if (matchesPaper) {
             isGroupMatched = true
-            matchedSubQIds = group.subQuestions.map(s => s.id)
+            matchedSubQIds = [] // 卷号搜索全套卷：不为小题添加金色高亮框，呈现纯净真题样式
           }
         }
       } else if (parsed.tokens.length === 0 && !parsed.qSpecifier) {
@@ -533,10 +533,11 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
 
   function searchPaper(paperFilename: string, type: 'SQ' | 'MCQ' = 'SQ') {
     if (!paperFilename) return
+    const clean = String(paperFilename).replace(/\.pdf$/i, '')
     if (type === 'SQ') {
-      sqKeyword.value = `qp:${paperFilename}`
+      sqKeyword.value = `qp:${clean}`
     } else {
-      mcqKeyword.value = `qp:${paperFilename}`
+      mcqKeyword.value = `qp:${clean}`
     }
     triggerSearch(type)
   }
@@ -621,7 +622,7 @@ export function useQuestionSearch(client: any, showToast?: (msg: string) => void
           main_question_number: getMainQuestionNumber(r.question_raw_number),
           question_raw_number: r.question_raw_number,
           score: r.score,
-          matchedSubQIds: [r.id],
+          matchedSubQIds: parsed.mode === 'qp' ? [] : [r.id],
           subQuestions: [r],
           primaryQuestion: r,
           details: r.details

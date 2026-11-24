@@ -29,6 +29,11 @@ const props = defineProps({
 const emit = defineEmits(['select', 'search-paper', 'remove-favorite', 'toggle-answer'])
 const { t } = useI18n()
 
+function cleanPaperName(filename) {
+  if (!filename) return ''
+  return String(filename).replace(/\.pdf$/i, '')
+}
+
 function getImageUrl(path) {
   if (!path) return ''
   if (path.startsWith('http://') || path.startsWith('https://')) return path
@@ -58,14 +63,13 @@ function onImageError(e, path) {
   >
     <div class="card-header">
       <div class="header-tags">
-        <span class="tag tag-series">{{ item.board || 'CAIE' }}</span>
         <button 
           type="button"
           class="tag tag-paper tag-clickable"
           @click.stop="emit('search-paper', item.paperFilename, item.paperType || 'SQ')"
-          :title="`qp:${item.paperFilename}`"
+          :title="`qp:${cleanPaperName(item.paperFilename)}`"
         >
-          📄 {{ item.paperFilename }}
+          📄 {{ cleanPaperName(item.paperFilename) }}
         </button>
         <span class="tag tag-qnum">
           {{ item.isSub ? `Part ${item.subQNum}` : `Q${item.subQNum || ''}` }}

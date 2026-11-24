@@ -265,6 +265,11 @@ function onImageError(e, path) {
   }
 }
 
+function cleanPaperName(filename) {
+  if (!filename) return ''
+  return String(filename).replace(/\.pdf$/i, '')
+}
+
 function toggleAnswer(subQId) {
   expandedAnswers.value[subQId] = !expandedAnswers.value[subQId]
 }
@@ -352,24 +357,16 @@ defineExpose({
             class="stream-question-card"
             :class="{ 'is-active-card': activeCardIndex === idx }"
           >
-            <!-- Card Header -->
+            <!-- Card Header: 精简至仅保留无 .pdf 后缀的试卷标签与操作按钮 -->
             <div class="card-header">
               <div class="header-tags">
-                <span class="tag tag-series">{{ group.series || group.primaryQuestion?.series || 'CAIE' }}</span>
                 <button 
                   class="tag tag-paper tag-clickable"
                   @click="emit('search-paper', group.paper_filename, group.paper_type || 'SQ')"
-                  :title="`qp:${group.paper_filename}`"
+                  :title="`qp:${cleanPaperName(group.paper_filename)}`"
                 >
-                  📄 {{ group.paper_filename }}
+                  📄 {{ cleanPaperName(group.paper_filename) }}
                 </button>
-                <span class="tag tag-qnum">
-                  {{ group.paper_type === 'SQ' ? `Question ${group.main_question_number}` : `Question ${group.question_raw_number}` }}
-                </span>
-                <!-- Search Match Indicator -->
-                <span v-if="group.matchedSubQIds && group.matchedSubQIds.length > 0" class="tag tag-match-pill">
-                  🎯 {{ locale === 'zh' ? `命中 ${group.matchedSubQIds.length} 问` : `${group.matchedSubQIds.length} matched` }}
-                </span>
               </div>
 
               <!-- Header Action Buttons (Icon Only) -->
@@ -404,7 +401,7 @@ defineExpose({
                 v-if="group.paper_type === 'SQ'"
                 :groupQuestions="group.subQuestions || [group]"
                 :matchedSubQIds="group.matchedSubQIds || []"
-                :isSearchActive="Boolean(searchActiveKeyword)"
+                :isSearchActive="Boolean(searchActiveKeyword) && !searchActiveKeyword.toLowerCase().startsWith('qp:')"
                 :expandedAnswers="expandedAnswers"
                 :expandedComments="expandedComments"
                 :isShortSubQ="isShortSubQ"
