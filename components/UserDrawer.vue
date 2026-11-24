@@ -22,16 +22,6 @@ const newEmailInput = ref('')
 const emailChangeLoading = ref(false)
 const emailChangeMsg = ref('')
 
-const displayUserId = computed(() => {
-  const raw = user.value?.id || user.value?.sub || ''
-  if (!raw) return '—'
-  return raw.length > 8 ? `${raw.slice(0, 8)}...` : raw
-})
-
-const fullUserId = computed(() => {
-  return user.value?.id || user.value?.sub || ''
-})
-
 async function handleSubmitEmailChange() {
   const target = newEmailInput.value.trim()
   if (!target) return
@@ -150,11 +140,6 @@ function handleSignOut() {
                     </button>
                   </div>
                   <p v-if="emailChangeMsg" class="email-change-tip">✉️ {{ emailChangeMsg }}</p>
-                </div>
-
-                <div class="meta-row">
-                  <span class="meta-label">{{ locale === 'zh' ? '账号 ID' : 'User ID' }}</span>
-                  <code class="meta-code" :title="fullUserId">{{ displayUserId }}</code>
                 </div>
               </div>
 
