@@ -1,6 +1,20 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+
+const props = defineProps({
+  compact: {
+    type: Boolean,
+    default: false
+  },
+  redirectOnSuccess: {
+    type: Boolean,
+    default: false
+  }
+})
+
+const emit = defineEmits(['success'])
+
 const { t, locale } = useI18n()
 const client = useSupabaseClient()
 
@@ -17,7 +31,10 @@ const handleLogin = async () => {
       password: password.value,
     })
     if (error) throw error
-    router.push('/')
+    emit('success')
+    if (props.redirectOnSuccess) {
+      router.push('/')
+    }
   } catch (error) {
     if (error instanceof Error) {
       alert(error.message)
@@ -36,7 +53,10 @@ const handleRegister = async () => {
     })
     if (error) throw error
     alert(locale.value === 'zh' ? '注册成功！请查收验证邮件以完成确认。' : 'Registration successful! Check your email to confirm.')
-    router.push('/')
+    emit('success')
+    if (props.redirectOnSuccess) {
+      router.push('/')
+    }
   } catch (error) {
     if (error instanceof Error) {
       alert(error.message)
@@ -67,10 +87,10 @@ const signInWithOAuth = async (provider) => {
 </script>
 
 <template>
-  <div class="auth-container">
-    <div class="auth-card">
-      <h1 class="header">{{ t('auth.signInTitle') }}</h1>
-      <p class="description">{{ locale === 'zh' ? '请登录以同步收藏夹与做题讨论' : 'Sign in to sync favorites & discussion' }}</p>
+  <div :class="compact ? 'auth-compact-wrap' : 'auth-container'">
+    <div :class="compact ? 'auth-compact-card' : 'auth-card'">
+      <h1 v-if="!compact" class="header">{{ t('auth.signInTitle') }}</h1>
+      <p class="description">{{ locale === 'zh' ? '请登录以同步多端收藏与笔记交流' : 'Sign in to sync favorites & discussion' }}</p>
       <div>
         <input class="inputField" type="email" :placeholder="t('auth.emailPlaceholder')" v-model="email" />
       </div>
@@ -95,7 +115,7 @@ const signInWithOAuth = async (provider) => {
           {{ t('auth.oauthGithub') }}
         </button>
       </div>
-      <div class="back-link">
+      <div v-if="!compact" class="back-link">
         <button @click="navigateTo('/')" class="button-link">&larr; {{ t('nav.backHome') }}</button>
       </div>
     </div>
@@ -103,6 +123,22 @@ const signInWithOAuth = async (provider) => {
 </template>
 
 <style scoped>
+.auth-compact-wrap {
+  width: 100%;
+}
+
+.auth-compact-card {
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.auth-compact-card .description {
+  margin: 0 0 1.2rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
 .auth-container {
   display: flex;
   justify-content: center;

@@ -7,6 +7,7 @@ const { profile, fetchProfile } = useUserProfile()
 const { locale, toggleLocale, t } = useI18n()
 const danmakuStore = useDanmaku()
 const isHelpModalOpen = ref(false)
+const isUserDrawerOpen = ref(false)
 
 function onGlobalMessagePosted(msg) {
   danmakuStore.broadcastGlobalComment(msg)
@@ -23,7 +24,7 @@ watch(user, async (newUser) => {
 
 async function signOut() {
   await client.auth.signOut()
-  navigateTo('/login')
+  isUserDrawerOpen.value = false
 }
 </script>
 
@@ -104,11 +105,16 @@ async function signOut() {
           <div class="auth-widget">
             <template v-if="user">
               <div class="user-split-control">
-                <!-- 左半段：进入个人主页与资料修改 -->
-                <NuxtLink to="/profile" class="usc-profile-link" :title="t('nav.profile')">
+                <!-- 左半段：就地打开个人资料管理侧边抽屉（无需跳转） -->
+                <button 
+                  type="button" 
+                  class="usc-profile-btn" 
+                  @click="isUserDrawerOpen = true" 
+                  :title="t('nav.profile')"
+                >
                   <img :src="profile?.avatar_url || 'https://via.placeholder.com/32'" class="nav-avatar" alt="Avatar" />
                   <span class="user-name">{{ profile?.display_name || user.email?.split('@')[0] || 'User' }}</span>
-                </NuxtLink>
+                </button>
 
                 <!-- 鲜明分界线 -->
                 <div class="usc-divider" aria-hidden="true"></div>
@@ -120,7 +126,15 @@ async function signOut() {
               </div>
             </template>
             <template v-else>
-              <NuxtLink to="/login" class="btn-signin">{{ t('nav.signIn') }}</NuxtLink>
+              <!-- 未登录：就地打开登录/注册侧边抽屉（无需跳转） -->
+              <button 
+                type="button" 
+                class="btn-signin" 
+                @click="isUserDrawerOpen = true"
+                :title="t('nav.signIn')"
+              >
+                {{ t('nav.signIn') }}
+              </button>
             </template>
           </div>
         </div>
@@ -143,6 +157,13 @@ async function signOut() {
       :isOpen="danmakuStore.isCommentModalOpen.value" 
       @close="danmakuStore.closeCommentModal" 
       @message-posted="onGlobalMessagePosted" 
+    />
+
+    <!-- User Profile & Auth Slide-Over Drawer (Zero Page Jump) -->
+    <UserDrawer 
+      :isOpen="isUserDrawerOpen" 
+      @close="isUserDrawerOpen = false" 
+      @sign-out="signOut" 
     />
   </div>
 </template>
@@ -457,18 +478,20 @@ async function signOut() {
   box-shadow: 0 2px 6px rgba(194, 65, 40, 0.08);
 }
 
-.usc-profile-link {
+.usc-profile-btn {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   height: 100%;
   padding: 0 10px 0 6px;
-  text-decoration: none;
+  border: none;
   background: transparent;
+  cursor: pointer;
   transition: background 0.15s ease;
+  box-sizing: border-box;
 }
 
-.usc-profile-link:hover {
+.usc-profile-btn:hover {
   background: var(--bg-surface-subtle);
 }
 
