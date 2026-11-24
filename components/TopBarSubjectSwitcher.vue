@@ -437,4 +437,18 @@ onUnmounted(() => {
   opacity: 0;
   transform: translateY(-4px);
 }
+
+@media (max-width: 640px) {
+  .subject-trigger-btn {
+    max-width: 125px;
+    height: 30px;
+    padding: 0 6px;
+    font-size: 0.76rem;
+    gap: 4px;
+  }
+  .subject-dropdown-panel {
+    width: 290px;
+    max-width: 88vw;
+  }
+}
 </style>

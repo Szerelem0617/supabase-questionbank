@@ -1059,4 +1059,15 @@ onUnmounted(() => {
   background: var(--accent-primary);
   color: #fff;
 }
+
+@media (max-width: 640px) {
+  .brand-fav-btn {
+    width: 30px;
+    height: 30px;
+  }
+  .fav-dropdown-menu {
+    width: 270px;
+    max-width: 88vw;
+  }
+}
 </style>

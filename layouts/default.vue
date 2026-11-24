@@ -206,7 +206,56 @@ async function signOut() {
 
 @media (max-width: 768px) {
   .nav-container {
-    padding: 0 16px;
+    padding: 0 12px;
+  }
+  .nav-brand-group {
+    gap: 8px;
+  }
+  .nav-actions {
+    gap: 6px;
+  }
+  /* 移动端完全移除顶栏弹幕胶囊：释放宽度，让位给题目全屏展示 */
+  .comment-split-control {
+    display: none !important;
+  }
+  /* 移动端个人中心精简化：隐藏冗长文字和退出按钮，仅展示头像圆圈，点击展开侧边抽屉 */
+  .user-split-control {
+    height: 32px;
+    width: 32px;
+    border-radius: 50%;
+    padding: 0;
+    justify-content: center;
+  }
+  .usc-profile-btn {
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    justify-content: center;
+  }
+  .nav-avatar {
+    width: 26px;
+    height: 26px;
+  }
+  .user-name,
+  .usc-divider,
+  .usc-signout-btn {
+    display: none !important;
+  }
+  .btn-signin {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 0.78rem;
+  }
+  .lang-switch-btn {
+    height: 30px;
+    padding: 0 8px;
+    font-size: 0.76rem;
+    gap: 3px;
+  }
+  .help-info-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
   }
 }
 
